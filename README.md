@@ -7,6 +7,11 @@ Sibling repo: [dsh-cc-plugins](https://github.com/jianxx/dsh-cc-plugins) (the CC
 **Status: no plugins yet.** The repo today carries only the development
 infrastructure: layout, scaffolding, presubmit gates, CI.
 
+Planned work items are specified in [`docs/design/`](docs/design/00-overview.md)
+— thirteen literature-grounded plugin designs (verification stack, long-run
+session protocol, issue-level control plane, lifecycle governance, security,
+observability), each split into PR-sized milestones.
+
 ## Layout
 
 ```
