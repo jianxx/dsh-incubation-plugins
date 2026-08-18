@@ -2,19 +2,14 @@
 
 Incubating plugins for the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). Experimental ideas live here first: every package ships as an independently installable unit that any dsh installation loads through its profile system, and graduates to the main plugin set once it proves out.
 
-Sibling repo: [dsh-cc-plugins](https://github.com/jianxx/dsh-cc-plugins) (the CC-parity plugin set) — this repository reuses its tooling (pnpm workspace + tsc project references + vitest, presubmit gates, profile sync scripts) and its loading conventions.
-
 **Status: no plugins yet.** The repo today carries only the development
 infrastructure: layout, scaffolding, presubmit gates, CI.
 
 Planned work items are specified in [`docs/design/`](docs/design/00-overview.md)
-— thirteen literature-grounded plugin designs (verification stack, long-run
-session protocol, issue-level control plane, lifecycle governance, security,
-observability), each split into PR-sized milestones.
 
 ## Layout
 
-```
+```text
 packages/
   <group>/<name>               one plugin per leaf; groups are thematic dirs
                                (interaction, core, hooks, memory, …)

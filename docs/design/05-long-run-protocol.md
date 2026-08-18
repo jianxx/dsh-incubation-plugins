@@ -98,7 +98,7 @@ other (see "Boundary of reset vs compaction").
 3. **System-prompt seam**: `ctx.systemPrompt.section({name, order, text})`
    returns an exact disposer
    (`packages/core/system-prompt/src/index.ts:381-390`); `PromptSection =
-   { name, order, text | (AssembleContext)=>string, complete? }`(`:53-75`);
+{ name, order, text | (AssembleContext)=>string, complete? }`(`:53-75`);
    re-registering the same name throws, scoped overrides global (by name),
    and empty text is dropped at render time (`renderPrompt` `:212-217`).
    An element provider runs on every assembly; `AssembleContext` carries
@@ -175,9 +175,9 @@ other (see "Boundary of reset vs compaction").
     file `:294-303`). fill% = totalTokens / contextWindow.
 11. **shell seam (optional)**: `ctx.shell: ShellExecutor`
     (`packages/shell/shell/src/index.ts:41-43`), `resolve(request): ShellExecSpec`
-    + `run(spec)`(`:85, :93`) — the workspace-dirty check and the init.sh
-    first commit go through it; when the service is absent, degrade to warn
-    (risk R4).
+    - `run(spec)`(`:85, :93`) — the workspace-dirty check and the init.sh
+      first commit go through it; when the service is absent, degrade to warn
+      (risk R4).
 12. **Event surface is closed**: custom session event types are closed to
     downstream plugins — the header comment of `known-event-types.ts`:
     "Downstream (out-of-repo) plugin events are outside this list by
@@ -210,12 +210,18 @@ goal: <one-sentence goal>
 round: 0
 updatedAt: <ISO8601>
 ---
+
 ## Goal
+
 ## Plan
-## Done       # - [x] items + evidence pointers (commit hash / file path / session seq links)
-## Next       # 1-3 immediate next steps
+
+## Done # - [x] items + evidence pointers (commit hash / file path / session seq links)
+
+## Next # 1-3 immediate next steps
+
 ## Blockers
-## Evidence   # run links: test commands, key output excerpts, relevant seq ranges
+
+## Evidence # run links: test commands, key output excerpts, relevant seq ranges
 ```
 
 **Parsing tolerance**: missing sections → treated as empty; unknown sections
@@ -227,9 +233,18 @@ The plugin **never rewrites** model-maintained content.
 `state.json`(plugin-private, small JSON):
 
 ```json
-{ "active": { "sessionId": "...", "goal": "...", "initedAt": "..." },
-  "handoffs": [{ "childSessionId": "...", "parentSessionId": "...",
-                 "boundary": 123, "reason": "manual|auto-suggest", "at": "..." }] }
+{
+  "active": { "sessionId": "...", "goal": "...", "initedAt": "..." },
+  "handoffs": [
+    {
+      "childSessionId": "...",
+      "parentSessionId": "...",
+      "boundary": 123,
+      "reason": "manual|auto-suggest",
+      "at": "..."
+    }
+  ]
+}
 ```
 
 Configuration (schemastery, three adjustable tiers, doc 00 tenet 3):
@@ -259,7 +274,7 @@ handler):
    already exists, skip and rename), write the `progress.md` scaffolding
    (goal into frontmatter), write `state.json.active`.
 3. With `--commit` and `ctx.shell` present: `git add .dsh/longrun && git
-   commit`, folding the result into the return text; shell absent → degrade
+commit`, folding the result into the return text; shell absent → degrade
    to a warn message.
 4. Echo the current markdown locations and a "protocol is now in effect"
    text. Idempotent: a repeat init errors out unless `--force`.
@@ -268,7 +283,7 @@ handler):
 listener is wrapped in try/catch throughout and never throws):
 
 1. mode==='off' → return immediately. Take the payload `{agent, turn,
-   signal}`; if `ctx.get('fs')` is absent → record one telemetry event and
+signal}`; if `ctx.get('fs')` is absent → record one telemetry event and
    let the turn pass.
 2. Read this session's progress baseline: when `turn/start` arrives (via
    the `session/event` firehose, declared at
@@ -291,8 +306,8 @@ listener is wrapped in try/catch throughout and never throws):
 4. audit mode: any catch only records telemetry and does not touch the
    turn. **enforce mode** with cap not exhausted:
    `agent.steer(createUserMessage({ content: concrete remediation text,
-   source: { kind:'plugin', plugin:'long-run-protocol', form:'notice',
-   summary: '<≤120-char summary>' } }))` — the remediation text is specific
+source: { kind:'plugin', plugin:'long-run-protocol', form:'notice',
+summary: '<≤120-char summary>' } }))` — the remediation text is specific
    about which check failed and what to do (which section of progress.md to
    update / commit or write into Blockers / which gate the goal still
    misses), embodying steer-back-not-veto (not refusing turn wrap-up, but
@@ -320,7 +335,7 @@ listener is wrapped in try/catch throughout and never throws):
   partial writes): goal / plan summary / done items / next / blockers /
   evidence pointers + a restatement of protocol obligations, delivered via
   `agent.inject(createUserMessage({..., source:{kind:'plugin', plugin:
-  'long-run-protocol', form:'recall', summary:'handoff'}}))`; record
+'long-run-protocol', form:'recall', summary:'handoff'}}))`; record
   `longrun/handoff-inject`. Degraded path for a lost state.json:
   `/longrun handoff` regenerates it manually.
 - auto-suggest: done incidentally inside the turn-stopping main flow —
@@ -340,12 +355,12 @@ listener is wrapped in try/catch throughout and never throws):
 
 ### Boundary of reset vs compaction
 
-| | compaction (upstream, already exists) | reset (this design) |
-|---|---|---|
-| Mechanism | In-place surface replacement within the same session; `compaction/*` are log-only shadow events only (`packages/compaction/compaction/src/types.ts:16-89`; the trigger `compaction-basic` hooks `agent/pre-step`, `src/index.ts:137-167`) | `sessions.fork` creates a new session seeded with the durable prefix up to an early boundary + handoff injected at resume |
-| durable log | Never touched | Parent log never touched; child = new log with lineage header |
-| Applies to | Mid-session step pressure, where the narrative still has reference value | Context anxiety, frequent overflow recovery, phase transitions |
-| Trigger | Automatic (within the thresholdRatio policy) | Manual command + auto-suggest (suggests forever, never forces) |
+|             | compaction (upstream, already exists)                                                                                                                                                                                                     | reset (this design)                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Mechanism   | In-place surface replacement within the same session; `compaction/*` are log-only shadow events only (`packages/compaction/compaction/src/types.ts:16-89`; the trigger `compaction-basic` hooks `agent/pre-step`, `src/index.ts:137-167`) | `sessions.fork` creates a new session seeded with the durable prefix up to an early boundary + handoff injected at resume |
+| durable log | Never touched                                                                                                                                                                                                                             | Parent log never touched; child = new log with lineage header                                                             |
+| Applies to  | Mid-session step pressure, where the narrative still has reference value                                                                                                                                                                  | Context anxiety, frequent overflow recovery, phase transitions                                                            |
+| Trigger     | Automatic (within the thresholdRatio policy)                                                                                                                                                                                              | Manual command + auto-suggest (suggests forever, never forces)                                                            |
 
 One verdict line: if old facts in the context **still need to be referenced
 back** → compact; if the old narrative has become a noise source → reset.

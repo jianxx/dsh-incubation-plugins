@@ -7,8 +7,6 @@
 **目标**:用声明式的 per-task 契约(工具顺序/调用次数/参数约束/状态前置)在线管控工具轨迹——pre-execute 处 allow/deny/ask 且 deny 必带引用条款的恢复性反馈——并对会话轨迹做离线合规评分与 ToolFailBench 类别指标。
 **用户问题**:用户布置有流程纪律的任务时(先跑测试再提交、别碰这个目录、重试最多三次)只能靠提示词祈祷;轨迹一旦走形——跳过测试直接 commit、拿到报错继续声称成功——没有告警、没有拦截、事后也没有度量,用户只能凭直觉觉得"这次跑得不太对"。
 
-
-
 ## 动机
 
 Agent 的失败很多不是"答错",而是**轨迹走形**:跳过测试直接 commit(Tool-Skip)、
@@ -55,9 +53,9 @@ ASK 一律走上游 `approval/request` seam(overview 原则 1),standalone 可工
    `packages/core/tools/src/index.ts:152`(listener 签名)与 `:588-591`:
    ```ts
    export type PreToolDecision =
-     | { kind: 'allow' }
-     | { kind: 'deny'; reason: string }
-     | { kind: 'ask'; reason?: string }
+     | { kind: "allow" }
+     | { kind: "deny"; reason: string }
+     | { kind: "ask"; reason?: string };
    ```
    waterfall 末尾缺省值为 `{ kind: 'allow' }`(`:1477`)。
 2. **ASK 的实际接线(插件不自己调 approval)**:registry 在 pre-execute 拿到
@@ -99,26 +97,26 @@ project 级覆盖,session attach 再覆盖( precedence:session > project > user 
 ```yaml
 # .dsh/trace.yml — 例:TDD flow
 name: tdd-flow
-mode: enforce            # off | audit | enforce(overview 原则 3 三档)
-ask:                     # SafetySentry dial:全局 ASK 阈值
-  default: false         # 命中 ask 级违规时是否升级为真人 ASK
-  escalateAfter: 2       # 同一规则被 deny≥N 次后,后续违规升级 ask(防死循环)
+mode: enforce # off | audit | enforce(overview 原则 3 三档)
+ask: # SafetySentry dial:全局 ASK 阈值
+  default: false # 命中 ask 级违规时是否升级为真人 ASK
+  escalateAfter: 2 # 同一规则被 deny≥N 次后,后续违规升级 ask(防死循环)
 rules:
   - id: test-before-commit
-    kind: sequence                       # 序列规则
-    pattern: "edit* test+ commit?"       # 类 regex:工具名 token + * + ? 量词
-    capture: { edited: "edit{file}" }    # 具名捕获,供 param 规则引用
-    window: turn                         # 匹配窗口:turn | session
-    action: deny                         # deny | ask | audit
+    kind: sequence # 序列规则
+    pattern: "edit* test+ commit?" # 类 regex:工具名 token + * + ? 量词
+    capture: { edited: "edit{file}" } # 具名捕获,供 param 规则引用
+    window: turn # 匹配窗口:turn | session
+    action: deny # deny | ask | audit
     message: "commit 前必须先运行 test(捕获文件 ${edited})"
   - id: bash-budget
-    kind: count                          # 计数规则
-    tool: bash                           # 或 pattern: "edit*"
+    kind: count # 计数规则
+    tool: bash # 或 pattern: "edit*"
     maxCalls: 40
     window: session
-    action: ask                          # 超预算不硬拦,问人
+    action: ask # 超预算不硬拦,问人
   - id: no-destructive-bash
-    kind: param                          # 参数约束(JSON-schema on parsed args)
+    kind: param # 参数约束(JSON-schema on parsed args)
     tool: bash
     schema:
       type: object
@@ -128,12 +126,12 @@ rules:
     action: deny
     message: "破坏性命令被契约禁止;如需清理请逐文件删除并说明理由"
   - id: build-clean-before-push
-    kind: state                          # 状态前置:只读探针,先于副作用步骤求值
-    before: "git push*"                  # 触发点(副作用模式)
-    probe: build.status                  # 引用 01 tool-manifest 的探针 id
+    kind: state # 状态前置:只读探针,先于副作用步骤求值
+    before: "git push*" # 触发点(副作用模式)
+    probe: build.status # 引用 01 tool-manifest 的探针 id
     expect: green
     action: deny
-    downgrade: audit                     # 无 manifest 插件/探针不可判定 → 降级
+    downgrade: audit # 无 manifest 插件/探针不可判定 → 降级
 ```
 
 设计要点:
@@ -167,11 +165,12 @@ tools/pre-execute(exec):
 ```
 
 恢复通道(AgentLTL 红线的落实):
+
 - **deny feedback wording 契约**:`reason` 必须包含 (a) 规则 id,(b) 违反条款的
   原文(message 模板渲染后),(c) 当前状态摘要(已用计数/序列进度),
   (d) 一句可操作的修正建议。模板:
   `trace-contract[test-before-commit]: commit 前必须先运行 test。当前序列:
-  edit(src/a.ts)×3, test×0。建议:现在运行 test,通过后再 commit。`
+edit(src/a.ts)×3, test×0。建议:现在运行 test,通过后再 commit。`
   因为上游把 reason 包成 `Error: …` tool result(上节接缝 5),模型下一轮
   必读得到,续轮即可 course-correct——不是死胡同。
 - **ask**:返回 `{ kind: 'ask', reason: <同上格式的条款渲染> }`,审批 UX/
@@ -191,6 +190,7 @@ session/event 流是恢复数据源(重启后可用 scorer 对窗口重放逐事
 `/trace detach`。命令注册 seam 见风险节。
 
 **Scorer flow(离线/直播)**:
+
 1. 输入:session 事件流重放(MVP:读持久 log);live 模式即订阅 `session/event`
    增量评分,但门状态与评分状态分离,互不污染。
 2. 对每条规则重放求值器,产出:合规率、每条规则命中/违规计数、违规时刻表。
@@ -220,13 +220,14 @@ seam,不 import、不探测其内部(overview 原则 1:编译期零依赖)。
 ### M1: contract schema + loader + pre-execute gate(allow / deny-with-feedback)
 
 schema 校验(zod-like)+ 两级文件加载(precedence:session > project > user)
-+ 序列增量匹配器(NFA)+ 计数器 + JSON-schema param 求值 + gate listener,
-deny reason 按"恢复通道 wording 契约"渲染;`mode: off/audit/enforce` 三档生效。
-**验证**:单测用 mock pipeline 驱动 `waterfall('tools/pre-execute')` ——
-(a) `edit* test+ commit?` 下跳 test 直接 commit 被 deny 且 reason 含规则 id、
-条款原文、状态摘要;(b) 计数超限在 enforce 下 deny、audit 下只记账;
-(c) gate 内部抛错被吞并记 `trace.gate_error`、调用放行;(d) 无契约时
-纯直通(next() 被调用)。
+
+- 序列增量匹配器(NFA)+ 计数器 + JSON-schema param 求值 + gate listener,
+  deny reason 按"恢复通道 wording 契约"渲染;`mode: off/audit/enforce` 三档生效。
+  **验证**:单测用 mock pipeline 驱动 `waterfall('tools/pre-execute')` ——
+  (a) `edit* test+ commit?` 下跳 test 直接 commit 被 deny 且 reason 含规则 id、
+  条款原文、状态摘要;(b) 计数超限在 enforce 下 deny、audit 下只记账;
+  (c) gate 内部抛错被吞并记 `trace.gate_error`、调用放行;(d) 无契约时
+  纯直通(next() 被调用)。
 
 ### M2: ask 路径 + /trace 命令 + 会话状态
 
@@ -260,7 +261,7 @@ attributes、body 形状对上 schema;模板包三份契约经 schema 校验全�
 
 1. **`/trace` 命令注册 seam 未验证**:上游插件如何注册 slash command 尚未定位到
    具体 API。检查:`grep -rn "registerCommand\|command/" packages/core packages/host
-   --include="*.ts"`(在 deepseek-harness 仓库),若 upstream 无命令 seam,
+--include="*.ts"`(在 deepseek-harness 仓库),若 upstream 无命令 seam,
    M2 命令降级为插件导出的程序化 API + doc 12 侧入口。
 2. **ops 指标的注入点**:`session-telemetry/record` 是捕获侧的变换 waterfall,
    "插件如何主动 emit 一条 ops record"的确切入口(capture coordinator 的公开

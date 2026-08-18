@@ -57,6 +57,16 @@ KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多
 | 11 | [silent-failure-watch](11-silent-failure-watch.md) | 3 | observability/silent-failure-watch | — | When Errors Become Narratives, ToolFailBench, OAT, AgentCheck |
 | 12 | [eval-harness](12-eval-harness.md) | 3 | eval/eval-harness | 03, 11 | GSME, Rethinking Harness Evolution, Demystifying Evals |
 | 13 | [subagent-context-scope](13-subagent-context-scope.md) | 3(spike 先行) | agents/subagent-context-scope | — | PerspectiveGap, PatchOptic(projected read) |
+| 14 | [science-agent-overview](14-science-agent-overview.md) | —(总纲,不占构建位) | — | — | Scientific Research Agents 综合(63 来源) |
+| 15 | [literature-evidence](15-literature-evidence.md) | 2 | science/literature-evidence | 01 | EMBL AI Librarian, Auditing RAG Hypotheses |
+| 16 | [analysis-workbench](16-analysis-workbench.md) | 2 | science/analysis-workbench | 01, 17 | Prompt-to-Paper(canonical results.json) |
+| 17 | [run-provenance](17-run-provenance.md) | 2 | science/run-provenance | 01;集成 03/04 | HEP(hash-chained log), 统一 provenance contract 缺口 |
+| 18 | [hpc-runner](18-hpc-runner.md) | 2 | science/hpc-runner | 01, 17 | 量子传感(18.9 h 长任务), 科研软件 HPC 需求清单 |
+| 19 | [evidence-registry](19-evidence-registry.md) | 3 | science/evidence-registry | 01, 02 | Danus(verifier-gated fact graph), HEP |
+| 20 | [citation-verify](20-citation-verify.md) | 3 | science/citation-verify | 01, 15 | Cited but Not Verified(三层归因) |
+| 21 | [domain-pack](21-domain-pack.md) | 3 | science/domain-pack | 01, 05, 08 | Vibe-FDTR(消融 98.9%→36.7%), TRACE |
+| 22 | [breeding-genomics-toolkit](22-breeding-genomics-toolkit.md) | 3 | breeding/genomics-toolkit | 21, 16, 18, 10 | Vibe-FDTR(领域封装), Prompt-to-Paper |
+| 23 | [breeding-data-adapters](23-breeding-data-adapters.md) | 3 | breeding/data-adapters | 21 | SciHorizon-DataEVA(数据就绪) |
 
 ## 构建顺序与合并策略
 
@@ -67,12 +77,19 @@ KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多
 01 ──► 10 ;01 ──► 09
 07 ;08 ;11 独立  →  12 依赖 03/11 的事件 schema
 13 先做 M0 spike,可行性报告决定是否立项
+15/17 ──► 16 ;17 ──► 18
+01 ──► 19 ──► 20
+01/05/08 ──► 21 ──► 22,23
 ```
+
+14 为总纲不占构建位。
 
 - **第一波**(立起三层验证栈):01 → 02 + 03 → 04
 - **第二波**(端到端压测):05 → 06(issue-pilot 真实驱动 04/05)
 - **第三波**(治理与安全):07, 08, 09 并行
 - **第四波**(纵深):10, 11, 12;13 看 spike 结论
+- **科研 W1**(分析与谱系底座):15 – 18(15/17 先行,详见 [14 号总纲](14-science-agent-overview.md))
+- **科研 W2**(证据治理与领域落地):19 – 23;更远的 W3 roadmap 仅列出不立项
 
 ## 毕业标准(incubation → dsh-cc-plugins 或上游)
 

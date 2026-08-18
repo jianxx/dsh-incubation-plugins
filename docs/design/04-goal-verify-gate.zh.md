@@ -7,8 +7,6 @@
 **目标**:给 goal 的 complete 转换装上必须实际执行并通过的验证 gate(command 退出码/文件存在与内容/会话事件证据);gate 不过=目标只能停在 active(STALL),永远不能说完成;连续失败按阈值升级为 ASK 交给用户裁决。
 **用户问题**:agent 自报"做完了"不需要任何成本——/goal 的完成判定今天完全靠模型自律,用户只能在事后收拾"宣布完成"与现实之间的落差;尤其无人值守的长任务,虚假完成是最贵的失败模式。
 
-
-
 ## 动机(为什么必要—DONE gate / 反虚假完成 / 三层状态恢复的第三层)
 
 doc 00 的三层状态恢复:事件流可恢复(session log replay,上游已有)→ 执行环境可恢复
@@ -34,7 +32,7 @@ gate 失败的反馈必须是**可行动的 corrective feedback**(哪个 gate �
 已核实(路径:行号在下节逐项列出):
 
 - `ctx.goals`(GoalService,event-sourced + CAS)已具全量域操作:`create / edit /
-  pause / resume / complete / block / clear`,durable `goal/change` 事件 +
+pause / resume / complete / block / clear`,durable `goal/change` 事件 +
   实时 `goal/changed` 通知;`goal-round-driver` 驱动续轮并对消息做 round 归因;
   tool-goal 已有 direct-human / goal-round 双权威通道。
 - 因此 GODR 生命周期 = 已有;**缺口精确为一点:`complete` 这一个 transition 上
@@ -63,7 +61,7 @@ done-ness。两部 durable 状态机对「完成与否」各说各话是本工�
    (`:314-337`、`:379-384`)— 按 `exec.name==='update_goal'` 且
    `arguments.action==='complete'` 命中,`arguments.goal_id` 直接给出目标。
 2. **服务层无 veto 缝**:`ctx.goals.complete`(`packages/goal/goal/src/index.ts
-   :336-346`)直通 transition,GoalService 没有任何 pre-mutation hook;
+:336-346`)直通 transition,GoalService 没有任何 pre-mutation hook;
    `goal/changed` 是 commit 之后的 emit 通知(`:541-558`,声明见
    `packages/goal/goal/src/domain.ts:104-116`),listener 失败被兜住但无法否决。
    用 cordis 服务同名重注册包裹 `goals` 不可行(服务键单主,重复注册即抛 —
@@ -81,7 +79,7 @@ done-ness。两部 durable 状态机对「完成与否」各说各话是本工�
    **同一个 open turn**(turn 尚未关),原 turn 的权威上下文(direct-human 或
    goal-round)保留,模型被 steer 后仍可合法调用 complete。归因形状照 tool-goal
    既有先例:`createUserMessage({ content, source: { kind: 'plugin',
-   plugin: 'goal-verify-gate', form: 'notice', summary } })`
+plugin: 'goal-verify-gate', form: 'notice', summary } })`
    (`packages/goal/tool-goal/src/index.ts:313-324` 的 deferContext 用法 —
    我们用 `agent.steer` 直接注入)。`kind:'plugin'` 不授予任何 goal 权威
    (`packages/goal/tool-goal/src/authority.ts:65-74`),也不会被 round driver 误收为
@@ -97,7 +95,7 @@ done-ness。两部 durable 状态机对「完成与否」各说各话是本工�
    goal/gate 明细放 `body`(不动 attributes 词汇纪律)。未挂载 backend 时跳过
    (`ctx.get('sessionTelemetry')` 判空)。
 6. **ASK 缝(stall 升级)**:`ApprovalRequest = { agent, toolName, callId?,
-   reason?, signal? }`(`packages/interaction/user-approval/src/index.ts:153-174`),
+reason?, signal? }`(`packages/interaction/user-approval/src/index.ts:153-174`),
    `ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'`
    (`packages/interaction/user-approval/src/types.ts:29`)。ASK 由 registry 代发,
    插件只需在 pre-execute 返回 `{ kind: 'ask', reason }` — reason 必须自带
@@ -123,34 +121,50 @@ done-ness。两部 durable 状态机对「完成与否」各说各话是本工�
 ### 数据模型 / 配置(gate declaration schema, modes, stall policy)
 
 ```ts
-type GateMode = 'off' | 'audit' | 'enforce'
+type GateMode = "off" | "audit" | "enforce";
 
 interface GateSpec {
-  id: string            // kebab-case, per-goal 唯一,遥测引用之
-  kind: string          // registry 键;内置见「内置 gate 清单」
-  mode?: GateMode       // 缺省回落全局 mode
-  config: JsonObject    // kind 专属参数
+  id: string; // kebab-case, per-goal 唯一,遥测引用之
+  kind: string; // registry 键;内置见「内置 gate 清单」
+  mode?: GateMode; // 缺省回落全局 mode
+  config: JsonObject; // kind 专属参数
 }
 
 interface GateReport {
-  gateId: string; kind: string; passed: boolean
-  detail: string        // 可行动描述:exit code、缺失路径、未命中正则…
-  durationMs: number; attemptedAt: number
+  gateId: string;
+  kind: string;
+  passed: boolean;
+  detail: string; // 可行动描述:exit code、缺失路径、未命中正则…
+  durationMs: number;
+  attemptedAt: number;
 }
 
-interface GoalGateState {           // .dsh/goal-verify-gate/goals/<goalId>.json
-  goalId: string
-  gates: GateSpec[]
-  consecutiveFailedCompletions: number
-  lastAttempt?: { at: number; allPassed: boolean; reports: GateReport[]; forced: boolean }
-}                                   // steerBack 计数为进程内 per-(goalId, round),不落盘
+interface GoalGateState {
+  // .dsh/goal-verify-gate/goals/<goalId>.json
+  goalId: string;
+  gates: GateSpec[];
+  consecutiveFailedCompletions: number;
+  lastAttempt?: {
+    at: number;
+    allPassed: boolean;
+    reports: GateReport[];
+    forced: boolean;
+  };
+} // steerBack 计数为进程内 per-(goalId, round),不落盘
 
-interface Config {                  // schemastery,照上游插件惯例
-  mode?: GateMode                   // 全局默认 'audit'(与 doc 02 一致)
-  gateTimeoutMs?: number            // 单 gate 超时,默认 120_000
-  stall?: { afterConsecutiveFails?: number /* 默认 3, min 1 */, escalateViaAsk?: boolean /* 默认 true */ }
-  steerBack?: { enabled?: boolean /* 默认 true */, maxPerGoalRound?: number /* 默认 2 */,
-                completionPatterns?: string[] /* 中英双语完成措辞正则,带保守默认库 */ }
+interface Config {
+  // schemastery,照上游插件惯例
+  mode?: GateMode; // 全局默认 'audit'(与 doc 02 一致)
+  gateTimeoutMs?: number; // 单 gate 超时,默认 120_000
+  stall?: {
+    afterConsecutiveFails?: number /* 默认 3, min 1 */;
+    escalateViaAsk?: boolean; /* 默认 true */
+  };
+  steerBack?: {
+    enabled?: boolean /* 默认 true */;
+    maxPerGoalRound?: number /* 默认 2 */;
+    completionPatterns?: string[]; /* 中英双语完成措辞正则,带保守默认库 */
+  };
 }
 ```
 
@@ -196,7 +210,7 @@ audit)`。`off` = 该 gate 完全不执行;`audit` = 执行、放行、记遥测
    `completionPatterns`。
 2. cap 检查:`steerCount(goalId, roundsStarted) < maxPerGoalRound` →
    `agent.steer(createUserMessage({ content: <下述文案>, source: { kind:'plugin',
-   plugin:'goal-verify-gate', form:'notice', summary }}))`,计数+1,发
+plugin:'goal-verify-gate', form:'notice', summary }}))`,计数+1,发
    `goal-verify-gate/steer-back` 遥测(info)。文案要点:列出该 goal 的 gates,
    要求「要么调用 update_goal complete 让 gates 跑起来,要么撤回完成措辞并说明
    剩余工作」。
@@ -240,14 +254,14 @@ store 文件随 terminal phase 清理;拒绝则计数保留,后续 attempt 继�
   `ctx.waterfall` 直驱法)— enforce 下 exit-1 命令 → `deny` 且 reason 含 gate id
   与 exit code;audit 下同样失败 → `allow` + 一条 warn 遥测;off → 全静默;
   gate runner 自身抛错 → fail-open + warn;存储文件 round-trip 与 clear 清理各一例。
-- **M2 — session-event-required + stall→ASK + turn-end steer-back + /goal-gate 命令
-  + 遥测补全**:observer 计数、consecutive 跟踪与 ask 升级、completionPatterns
-  默认库(中英双语)与 steer 注入、`/goal-gate add|list|remove|reset`。
-  **验证**:合成会话 — 连续失败达阈值后下一次 complete 返回 `ask`(无 approval
-  backend 的部署确定性降级为 deny,照 `serviceAsk` 既有行为断言);turn-stopping
-  触发注入的消息 `source.kind==='plugin'` 且 attribution 完整;同 round 第三次
-  steer 不再注入(cap);listener 注入异常被吞且 turn 正常关闭;`/goal-gate add`
-  落盘后,同 session 内 complete 拦截生效。
+- \*\*M2 — session-event-required + stall→ASK + turn-end steer-back + /goal-gate 命令
+  - 遥测补全**:observer 计数、consecutive 跟踪与 ask 升级、completionPatterns
+    默认库(中英双语)与 steer 注入、`/goal-gate add|list|remove|reset`。
+    **验证\*\*:合成会话 — 连续失败达阈值后下一次 complete 返回 `ask`(无 approval
+    backend 的部署确定性降级为 deny,照 `serviceAsk` 既有行为断言);turn-stopping
+    触发注入的消息 `source.kind==='plugin'` 且 attribution 完整;同 round 第三次
+    steer 不再注入(cap);listener 注入异常被吞且 turn 正常关闭;`/goal-gate add`
+    落盘后,同 session 内 complete 拦截生效。
 - **M3 — trace-report kind(03 运行时可选)+ 指标聚合 + 文档**:registry 运行时
   查找 03、缺席降级逻辑、ops 遥测的聚合视图脚本(误拦率、steer 命中、stall 次数)、
   README(含 graduation criteria 一节,勾选项含「premature-completion 拦截次数」
@@ -304,7 +318,7 @@ store 文件随 terminal phase 清理;拒绝则计数保留,后续 attempt 继�
 
 ---
 
-*Verified seams(路径:行号均已在 2026-08-17 核读)*:
+_Verified seams(路径:行号均已在 2026-08-17 核读)_:
 `packages/goal/tool-goal/src/index.ts:41-43 / :307-308 / :313-324`;
 `packages/goal/tool-goal/src/authority.ts:65-74 / :101-108`;
 `packages/goal/goal/src/index.ts:336-346 / :541-558`;

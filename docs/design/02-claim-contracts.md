@@ -7,8 +7,6 @@
 **Goal**: enforce code-level admission on tool results and assistant claims before they enter the context or reach the user (schema shape / freshness / provenance / domain rules), and audit assistant claims at end-of-turn into a three-way verdict: supported / unsupported / unverifiable.
 **User problem**: users cannot trust what the agent says — "file created" or "tests pass" may be fabricated outright or built on truncated, stale tool results; once dirty data enters the context it silently poisons every later inference, the error surfaces far downstream, and prompt-level "please be honest" has never been a load-bearing wall.
 
-
-
 ## Motivation (why this is needed — the missing layer of the three-layer stack)
 
 The three faces of the three-layer verification stack are not substitutable for
@@ -129,14 +127,14 @@ Contract files (YAML, one per file, `.dsh/contracts/*.yml`; built-in contracts
 ship with the package in the same format):
 
 ```yaml
-id: fs-read-missing-file        # globally unique; telemetry references it
+id: fs-read-missing-file # globally unique; telemetry references it
 version: 1
-tool: fs/read                   # tool name or glob; resolved by name via the doc 01 manifest
-validator: domain               # json-schema | freshness | provenance | domain
-mode: enforce                   # off | audit | enforce (can be overridden by higher-level config)
+tool: fs/read # tool name or glob; resolved by name via the doc 01 manifest
+validator: domain # json-schema | freshness | provenance | domain
+mode: enforce # off | audit | enforce (can be overridden by higher-level config)
 when: { result.isError: false } # applicability predicate; runs only on matching results
-checks: ...                     # kind-specific parameters (see below)
-feedback: |                     # actionable feedback template injected to the model on block
+checks: ... # kind-specific parameters (see below)
+feedback: | # actionable feedback template injected to the model on block
   fs/read target {{args.path}} does not exist: confirm with fs/list first, or create it and retry.
 ```
 
@@ -166,13 +164,13 @@ assertions (file existence) when needed. Each claim produces a flag:
 
 ```ts
 type ClaimFlag = {
-  plugin: 'claim-contracts'      // attribution (doc 00 tenet: observations carry provenance)
-  patternId: string
-  claim: { text: string; turn: number; sourceSeq: number } // provenance seq
-  verdict: 'supported' | 'unsupported' | 'unverifiable'    // abstain is a verdict, not a violation
-  evidence: { eventSeqs: number[]; fsFacts?: string[] }    // nullable
-  mode: 'audit' | 'enforce'      // always audit in v1
-}
+  plugin: "claim-contracts"; // attribution (doc 00 tenet: observations carry provenance)
+  patternId: string;
+  claim: { text: string; turn: number; sourceSeq: number }; // provenance seq
+  verdict: "supported" | "unsupported" | "unverifiable"; // abstain is a verdict, not a violation
+  evidence: { eventSeqs: number[]; fsFacts?: string[] }; // nullable
+  mode: "audit" | "enforce"; // always audit in v1
+};
 ```
 
 ### Key behavior flows (post-execute admission flow; claim-audit flow; abstain path)
@@ -329,7 +327,7 @@ existing API.
 
 ---
 
-*Verified seams (all path:line citations re-read in 2026-08)*: `packages/core/tools/src/index.ts`
+_Verified seams (all path:line citations re-read in 2026-08)_: `packages/core/tools/src/index.ts`
 :175 / :556-600 / :1742-1781; `packages/core/tools/tests/tools.spec.ts:856-872`;
 `packages/core/session/src/index.ts:76`; `packages/core/session/src/types.ts`
 :155-177 / :243-297 / :415-447; `packages/session/session-telemetry/src/index.ts`

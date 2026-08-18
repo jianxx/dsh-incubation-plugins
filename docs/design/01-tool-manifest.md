@@ -7,8 +7,6 @@
 **Goal**: provide the single per-tool metadata registry (effect class / idempotency recipe / disclosure class / failure semantics) for every gate/verify-type plugin, with a builtin core-tool manifest, user overlays, and a fail-closed default for unknown tools.
 **User problem**: today, anyone adding "is this call safe / can it be retried" logic to the agent hand-rolls a hard-coded tool list; as those lists drift apart, the same tool is allowed in one place and blocked in another — the user faces self-contradicting behavior with no authoritative answer anywhere.
 
-
-
 ## Motivation (why it's needed)
 
 The three-layer verification stack (trace property / action gate / claim contract)
@@ -59,7 +57,7 @@ Seams verified one by one (file:line):
   (`class PermissionRulesService extends Service`, with `super(ctx, 'permissionRules')`
   in the constructor, `static inject = ['tools']`, and type declaration merging via
   `declare module '@deepseek-ai/cordis' { interface
-  Context { permissionRules: ... } }`). tool-manifest follows this pattern to mount
+Context { permissionRules: ... } }`). tool-manifest follows this pattern to mount
   `ctx.toolManifest`; the `toolManifest` key has zero grep hits in both the
   deepseek-harness and dsh-cc-plugins repos — no conflict.
 - **Tool enumeration API** (the core consumption seam): in
@@ -79,38 +77,48 @@ Seams verified one by one (file:line):
   permission-rules/src/index.ts:216.
 
 The **read direction** of tool enumeration: tool-manifest listens to `tools/change`
-+ calls `ctx.tools.schemas()` for coverage statistics; it **never** demands in the
-reverse direction that dsh tool registration carry new fields (zero upstream
-changes — purely a plugin-side overlay).
+
+- calls `ctx.tools.schemas()` for coverage statistics; it **never** demands in the
+  reverse direction that dsh tool registration carry new fields (zero upstream
+  changes — purely a plugin-side overlay).
 
 ### Data model / configuration
 
 ```ts
 // A single manifest entry (all fields except pattern/description are optional → covered by defaults)
 interface ToolManifestEntry {
-  pattern: string            // tool-name glob, same semantics as permission-rule matchContent ('*' / ':*')
-  description: string        // human-readable classification rationale (for audit; never enters model context)
-  effectClass?: 'readonly' | 'write-local' | 'side-effecting'
-              | 'external-disclosure' | 'authority-change' | 'irreversible'
+  pattern: string; // tool-name glob, same semantics as permission-rule matchContent ('*' / ':*')
+  description: string; // human-readable classification rationale (for audit; never enters model context)
+  effectClass?:
+    | "readonly"
+    | "write-local"
+    | "side-effecting"
+    | "external-disclosure"
+    | "authority-change"
+    | "irreversible";
   idempotency?: {
-    argFields: string[]      // argument paths participating in the hash (e.g. ['file_path','content'])
-    timeBucketSec?: number   // time-bucket granularity; 0 = exclude time (pure content addressing)
-  }                          // deterministic idempotency key = hash(argFields values + agentId + floor(now/bucket))
-  retryProbe?: {             // lets doc 10 verified-tools autopsy the failure before retrying
-    kind: 'shell-command' | 'tool-call'
-    command?: string         // probe command when kind=shell-command (template may reference args)
-    tool?: string            // probe tool name when kind=tool-call (must be effectClass=readonly)
-    args?: Record<string, unknown>
-    expect: string           // postcondition expression (e.g. exit=0 and stdout matches glob)
-  }
-  disclosureClass?: 'none' | 'egress-payload' | 'publish'
-  failureSemantics?: 'atomic' | 'timeout-ambiguous' | 'partial-visibility'
+    argFields: string[]; // argument paths participating in the hash (e.g. ['file_path','content'])
+    timeBucketSec?: number; // time-bucket granularity; 0 = exclude time (pure content addressing)
+  }; // deterministic idempotency key = hash(argFields values + agentId + floor(now/bucket))
+  retryProbe?: {
+    // lets doc 10 verified-tools autopsy the failure before retrying
+    kind: "shell-command" | "tool-call";
+    command?: string; // probe command when kind=shell-command (template may reference args)
+    tool?: string; // probe tool name when kind=tool-call (must be effectClass=readonly)
+    args?: Record<string, unknown>;
+    expect: string; // postcondition expression (e.g. exit=0 and stdout matches glob)
+  };
+  disclosureClass?: "none" | "egress-payload" | "publish";
+  failureSemantics?: "atomic" | "timeout-ambiguous" | "partial-visibility";
 }
 
 interface ManifestFile {
-  version: 1
-  entries: ToolManifestEntry[]
-  provenance?: { source: 'builtin' | 'plugin-declared' | 'user-overlay'; ref: string }
+  version: 1;
+  entries: ToolManifestEntry[];
+  provenance?: {
+    source: "builtin" | "plugin-declared" | "user-overlay";
+    ref: string;
+  };
 }
 ```
 
@@ -151,19 +159,19 @@ payload content — the manifest layer does not answer for it.
 
 Shipped with the package in M2 (JSON), with per-tool grading rationale:
 
-| Tool | effectClass | disclosureClass | failureSemantics | Idempotency / rationale |
-|---|---|---|---|---|
-| `read`,`list`,`glob`,`grep` (fs-search) | `readonly` | `none` | `atomic` | read-only; idempotency key = path/pattern args, pure content addressing |
-| `write`,`str_replace_editor` | `write-local` | `none` | `atomic` | modifies local files; failure means no write; idempotency key = file_path + content hash |
-| `bash`,`pwsh` | `side-effecting` | `egress-payload` | `timeout-ambiguous` | commands can touch the network and mutate the system; timeout does not mean not executed; no retry — retryProbe is supplied by the caller |
-| `skill` | `readonly` | `none` | `atomic` | only loads instruction text into context, no writes of its own; any follow-up actions are the responsibility of the subsequent tools |
-| `todo` | `write-local` | `none` | `atomic` | in-session state; idempotency key = the full entry set |
-| `goal` | `authority-change` | `none` | `atomic` | changes the agent's goal stack — an authority/intent-surface change that gate-type plugins must question separately |
-| `subagent`,`fork` | `side-effecting` | `none` | `timeout-ambiguous` | spawned subagents call tools on their own; whether the child has started is unknowable at the timeout point |
-| `report` (subagent report-back) | `write-local` | `none` | `atomic` | writes only to the parent session context |
-| `list_agents` | `readonly` | `none` | `atomic` | pure query |
-| `jobs`,`workflow`,`ralph` | `side-effecting` | `none` | `timeout-ambiguous` | schedules/orchestrates background execution; after submission the main execution body may already be running |
-| `web_search` | `external-disclosure` | `egress-payload` | `atomic` | the query goes out to a search provider — it is itself a disclosure act; resending the same query adds no new disclosure; idempotency key = query + day-granularity time bucket |
+| Tool                                    | effectClass           | disclosureClass  | failureSemantics    | Idempotency / rationale                                                                                                                                                         |
+| --------------------------------------- | --------------------- | ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`,`list`,`glob`,`grep` (fs-search) | `readonly`            | `none`           | `atomic`            | read-only; idempotency key = path/pattern args, pure content addressing                                                                                                         |
+| `write`,`str_replace_editor`            | `write-local`         | `none`           | `atomic`            | modifies local files; failure means no write; idempotency key = file_path + content hash                                                                                        |
+| `bash`,`pwsh`                           | `side-effecting`      | `egress-payload` | `timeout-ambiguous` | commands can touch the network and mutate the system; timeout does not mean not executed; no retry — retryProbe is supplied by the caller                                       |
+| `skill`                                 | `readonly`            | `none`           | `atomic`            | only loads instruction text into context, no writes of its own; any follow-up actions are the responsibility of the subsequent tools                                            |
+| `todo`                                  | `write-local`         | `none`           | `atomic`            | in-session state; idempotency key = the full entry set                                                                                                                          |
+| `goal`                                  | `authority-change`    | `none`           | `atomic`            | changes the agent's goal stack — an authority/intent-surface change that gate-type plugins must question separately                                                             |
+| `subagent`,`fork`                       | `side-effecting`      | `none`           | `timeout-ambiguous` | spawned subagents call tools on their own; whether the child has started is unknowable at the timeout point                                                                     |
+| `report` (subagent report-back)         | `write-local`         | `none`           | `atomic`            | writes only to the parent session context                                                                                                                                       |
+| `list_agents`                           | `readonly`            | `none`           | `atomic`            | pure query                                                                                                                                                                      |
+| `jobs`,`workflow`,`ralph`               | `side-effecting`      | `none`           | `timeout-ambiguous` | schedules/orchestrates background execution; after submission the main execution body may already be running                                                                    |
+| `web_search`                            | `external-disclosure` | `egress-payload` | `atomic`            | the query goes out to a search provider — it is itself a disclosure act; resending the same query adds no new disclosure; idempotency key = query + day-granularity time bucket |
 
 (web_fetch is disabled upstream and not in the manifest; if enabled later, default
 to `external-disclosure` + `egress-payload`, plus `publish` only when the target is
@@ -213,7 +221,7 @@ a public site.)
   `ctx.tools.schemas(scope?)` (per-agent tool variants) have not been verified line
   by line — whether the coverage lint needs to iterate all agent scopes will be
   checked at M2 implementation time with `grep -n "ScopeKey"
-  packages/core/tools/src/index.ts`, then backfilled with tests.
+packages/core/tools/src/index.ts`, then backfilled with tests.
 - **user-overlay file watching**: whether dsh has an existing config-file watch
   facility (like settings' installSettingsSection) is unverified; M1 reads once,
   and hot update is demoted to an open question.

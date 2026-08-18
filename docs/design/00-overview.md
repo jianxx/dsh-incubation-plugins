@@ -57,21 +57,31 @@ CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
 
 ## Work items
 
-| # | Doc | Tier | Package | Depends on | Literature anchors |
-|---|-----|------|---------|-----------|--------------------|
-| 01 | [tool-manifest](01-tool-manifest.md) | 1 (substrate) | verification/tool-manifest | — | Verified Tool Calls, TokenWall, cross-cutting |
-| 02 | [claim-contracts](02-claim-contracts.md) | 1 | verification/claim-contracts | 01 | Prompts-to-Contracts, Forethought, EG-VAR |
-| 03 | [trace-contracts](03-trace-contracts.md) | 1 | verification/trace-contracts | — | AgentLTL, Reason-Less-Verify-More, ToolFailBench, SafetySentry |
-| 04 | [goal-verify-gate](04-goal-verify-gate.md) | 1 | goals/goal-verify-gate | — | Goal-Autopilot, GODR |
-| 05 | [long-run-protocol](05-long-run-protocol.md) | 1 | session/long-run-protocol | (04 optional) | Effective Harnesses, Harness Design |
-| 06 | [issue-pilot](06-issue-pilot.md) | 1 | control-plane/issue-pilot | 04, 05, 01 | Symphony, SwarmResearch (branch isolation) |
-| 07 | [rules-lifecycle](07-rules-lifecycle.md) | 2 | memory/rules-lifecycle | — | Self-Improving Coding Agents, AMV-L, MemCon |
-| 08 | [skill-lifecycle](08-skill-lifecycle.md) | 2 | skills/skill-lifecycle | — | Dynamic Agent Skills (8 stages), Progressive Crystallization, SkillOpt |
-| 09 | [token-wall](09-token-wall.md) | 2 | security/token-wall | 01 | TokenWall, Semantic Gateway, compositional harm |
-| 10 | [verified-tools](10-verified-tools.md) | 3 | verification/verified-tools | 01 | Verified Tool Calls (2608.02645) |
-| 11 | [silent-failure-watch](11-silent-failure-watch.md) | 3 | observability/silent-failure-watch | — | When Errors Become Narratives, ToolFailBench, OAT, AgentCheck |
-| 12 | [eval-harness](12-eval-harness.md) | 3 | eval/eval-harness | 03, 11 | GSME, Rethinking Harness Evolution, Demystifying Evals |
-| 13 | [subagent-context-scope](13-subagent-context-scope.md) | 3 (spike first) | agents/subagent-context-scope | — | PerspectiveGap, PatchOptic (projected read) |
+| #   | Doc                                                    | Tier            | Package                            | Depends on    | Literature anchors                                                     |
+| --- | ------------------------------------------------------ | --------------- | ---------------------------------- | ------------- | ---------------------------------------------------------------------- |
+| 01  | [tool-manifest](01-tool-manifest.md)                   | 1 (substrate)   | verification/tool-manifest         | —             | Verified Tool Calls, TokenWall, cross-cutting                          |
+| 02  | [claim-contracts](02-claim-contracts.md)               | 1               | verification/claim-contracts       | 01            | Prompts-to-Contracts, Forethought, EG-VAR                              |
+| 03  | [trace-contracts](03-trace-contracts.md)               | 1               | verification/trace-contracts       | —             | AgentLTL, Reason-Less-Verify-More, ToolFailBench, SafetySentry         |
+| 04  | [goal-verify-gate](04-goal-verify-gate.md)             | 1               | goals/goal-verify-gate             | —             | Goal-Autopilot, GODR                                                   |
+| 05  | [long-run-protocol](05-long-run-protocol.md)           | 1               | session/long-run-protocol          | (04 optional) | Effective Harnesses, Harness Design                                    |
+| 06  | [issue-pilot](06-issue-pilot.md)                       | 1               | control-plane/issue-pilot          | 04, 05, 01    | Symphony, SwarmResearch (branch isolation)                             |
+| 07  | [rules-lifecycle](07-rules-lifecycle.md)               | 2               | memory/rules-lifecycle             | —             | Self-Improving Coding Agents, AMV-L, MemCon                            |
+| 08  | [skill-lifecycle](08-skill-lifecycle.md)               | 2               | skills/skill-lifecycle             | —             | Dynamic Agent Skills (8 stages), Progressive Crystallization, SkillOpt |
+| 09  | [token-wall](09-token-wall.md)                         | 2               | security/token-wall                | 01            | TokenWall, Semantic Gateway, compositional harm                        |
+| 10  | [verified-tools](10-verified-tools.md)                 | 3               | verification/verified-tools        | 01            | Verified Tool Calls (2608.02645)                                       |
+| 11  | [silent-failure-watch](11-silent-failure-watch.md)     | 3               | observability/silent-failure-watch | —             | When Errors Become Narratives, ToolFailBench, OAT, AgentCheck          |
+| 12  | [eval-harness](12-eval-harness.md)                     | 3               | eval/eval-harness                  | 03, 11        | GSME, Rethinking Harness Evolution, Demystifying Evals                 |
+| 13  | [subagent-context-scope](13-subagent-context-scope.md) | 3 (spike first) | agents/subagent-context-scope      | —             | PerspectiveGap, PatchOptic (projected read)                            |
+| 14  | [science-agent-overview](14-science-agent-overview.md) | — (charter, no build slot) | —                         | —             | Scientific Research Agents synthesis (63 sources)                      |
+| 15  | [literature-evidence](15-literature-evidence.md)       | 2               | science/literature-evidence        | 01            | EMBL AI Librarian, Auditing RAG Hypotheses                             |
+| 16  | [analysis-workbench](16-analysis-workbench.md)         | 2               | science/analysis-workbench         | 01, 17        | Prompt-to-Paper (canonical results.json)                               |
+| 17  | [run-provenance](17-run-provenance.md)                 | 2               | science/run-provenance             | 01; integrates 03/04 | HEP (hash-chained log), missing unified provenance contract    |
+| 18  | [hpc-runner](18-hpc-runner.md)                         | 2               | science/hpc-runner                 | 01, 17        | Autonomous quantum sensing (18.9 h run), HPC requirements for research software |
+| 19  | [evidence-registry](19-evidence-registry.md)           | 3               | science/evidence-registry          | 01, 02        | Danus (verifier-gated fact graph), HEP                                 |
+| 20  | [citation-verify](20-citation-verify.md)               | 3               | science/citation-verify            | 01, 15        | Cited but Not Verified (three-layer attribution)                       |
+| 21  | [domain-pack](21-domain-pack.md)                       | 3               | science/domain-pack                | 01, 05, 08    | Vibe-FDTR (ablation 98.9%→36.7%), TRACE                                |
+| 22  | [breeding-genomics-toolkit](22-breeding-genomics-toolkit.md) | 3         | breeding/genomics-toolkit          | 21, 16, 18, 10 | Vibe-FDTR (domain packaging), Prompt-to-Paper                         |
+| 23  | [breeding-data-adapters](23-breeding-data-adapters.md) | 3               | breeding/data-adapters             | 21            | SciHorizon-DataEVA (data readiness)                                    |
 
 ## Build order and merge strategy
 
@@ -82,12 +92,21 @@ CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
 01 ──► 10 ; 01 ──► 09
 07 ; 08 ; 11 independent  →  12 consumes the event schemas of 03/11
 13 runs its M0 spike first; the feasibility verdict decides whether to build
+15/17 ──► 16 ; 17 ──► 18
+01 ──► 19 ──► 20
+01/05/08 ──► 21 ──► 22, 23
 ```
+
+14 is a charter and takes no build slot.
 
 - **Wave 1** (stand up the three-layer verification stack): 01 → 02 + 03 → 04
 - **Wave 2** (end-to-end pressure test): 05 → 06 (issue-pilot drives 04/05 for real)
 - **Wave 3** (governance and security): 07, 08, 09 in parallel
 - **Wave 4** (depth): 10, 11, 12; 13 depends on the spike verdict
+- **Science W1** (analysis & lineage substrate): 15 – 18 (15/17 lead; see the
+  [14 charter](14-science-agent-overview.md))
+- **Science W2** (evidence governance & domain landing): 19 – 23; the farther
+  W3 roadmap is listed only, not chartered
 
 ## Graduation criteria (incubation → dsh-cc-plugins or upstream)
 

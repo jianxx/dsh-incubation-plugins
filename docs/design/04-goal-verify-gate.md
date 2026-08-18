@@ -7,8 +7,6 @@
 **Goal**: gate the goal's `complete` transition behind verification gates that must actually execute and pass (command exit codes / file existence and content / session-event evidence); a failing gate leaves the goal active (STALL) — completion can never be claimed without evidence — and repeated failures escalate to an ASK for the user at a configurable threshold.
 **User problem**: the agent declaring "done" costs it nothing — today a /goal's completion is pure model self-discipline, and the user only discovers the gap between "announced complete" and reality afterwards; in unattended long runs, fabricated completion is the most expensive failure mode there is.
 
-
-
 ## Motivation (why this is necessary — DONE gate / anti-false-completion / the third layer of three-layer state recovery)
 
 doc 00's three-layer state recovery: resumable event stream (session log replay,
@@ -43,7 +41,7 @@ Verified (paths and line numbers are itemized in the next section):
 
 - `ctx.goals` (GoalService, event-sourced + CAS) already has the full set of
   domain operations: `create / edit / pause / resume / complete / block /
-  clear`, the durable `goal/change` event + the real-time `goal/changed`
+clear`, the durable `goal/change` event + the real-time `goal/changed`
   notification; `goal-round-driver` drives round continuation and attributes
   messages to rounds; tool-goal already has the dual authority channels
   direct-human / goal-round.
@@ -77,7 +75,7 @@ the complete transition (a domain extension of GoalService), with the
    `allowed-once → allow`, the other three states → differently worded
    denies; **with no approval service, ask deterministically degrades to
    deny**. The input `ToolExecution` carries `{name, arguments, callId,
-   agent?, signal}` (`:314-337`, `:379-384`) — matched on
+agent?, signal}` (`:314-337`, `:379-384`) — matched on
    `exec.name==='update_goal'` and `arguments.action==='complete'`, with
    `arguments.goal_id` directly yielding the target.
 2. **No veto seam at the service layer**: `ctx.goals.complete`
@@ -107,7 +105,7 @@ the complete transition (a domain extension of GoalService), with the
    goal-round) is preserved, and the model may still legitimately call
    complete after being steered. The attribution shape follows tool-goal's
    existing precedent: `createUserMessage({ content, source: { kind:
-   'plugin', plugin: 'goal-verify-gate', form: 'notice', summary } })`
+'plugin', plugin: 'goal-verify-gate', form: 'notice', summary } })`
    (the deferContext usage at `packages/goal/tool-goal/src/index.ts:313-324` —
    we inject directly via `agent.steer`). `kind:'plugin'` grants no goal
    authority (`packages/goal/tool-goal/src/authority.ts:65-74`) and is not
@@ -122,14 +120,14 @@ the complete transition (a domain extension of GoalService), with the
    send point = `ctx.sessionTelemetry.emit()` (service-key registration
    `:148-151`, sink emit is a non-blocking enqueue `:94-104`). This plugin
    uses the **ops channel** exclusively, with `attributes = { telemetry.op:
-   'goal-verify-gate/<event>', session.id, agent.id }`; goal/gate details go
+'goal-verify-gate/<event>', session.id, agent.id }`; goal/gate details go
    in `body` (the attributes vocabulary discipline is untouched). Skipped
    when no backend is mounted (null-check via `ctx.get('sessionTelemetry')`).
 6. **ASK seam (stall escalation)**: `ApprovalRequest = { agent, toolName,
-   callId?, reason?, signal? }`
+callId?, reason?, signal? }`
    (`packages/interaction/user-approval/src/index.ts:153-174`),
    `ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' |
-   'unavailable'` (`packages/interaction/user-approval/src/types.ts:29`). ASK
+'unavailable'` (`packages/interaction/user-approval/src/types.ts:29`). ASK
    is dispatched by the registry on the plugin's behalf — the plugin only
    returns `{ kind: 'ask', reason }` from pre-execute; the reason must itself
    carry the gate-failure summary and an explanation of the decision options
@@ -162,34 +160,50 @@ the complete transition (a domain extension of GoalService), with the
 ### Data model / configuration (gate declaration schema, modes, stall policy)
 
 ```ts
-type GateMode = 'off' | 'audit' | 'enforce'
+type GateMode = "off" | "audit" | "enforce";
 
 interface GateSpec {
-  id: string            // kebab-case, unique per goal, referenced by telemetry
-  kind: string          // registry key; built-ins see "Built-in gate list"
-  mode?: GateMode       // falls back to the global mode when unset
-  config: JsonObject    // kind-specific parameters
+  id: string; // kebab-case, unique per goal, referenced by telemetry
+  kind: string; // registry key; built-ins see "Built-in gate list"
+  mode?: GateMode; // falls back to the global mode when unset
+  config: JsonObject; // kind-specific parameters
 }
 
 interface GateReport {
-  gateId: string; kind: string; passed: boolean
-  detail: string        // actionable description: exit code, missing path, unmatched regex…
-  durationMs: number; attemptedAt: number
+  gateId: string;
+  kind: string;
+  passed: boolean;
+  detail: string; // actionable description: exit code, missing path, unmatched regex…
+  durationMs: number;
+  attemptedAt: number;
 }
 
-interface GoalGateState {           // .dsh/goal-verify-gate/goals/<goalId>.json
-  goalId: string
-  gates: GateSpec[]
-  consecutiveFailedCompletions: number
-  lastAttempt?: { at: number; allPassed: boolean; reports: GateReport[]; forced: boolean }
-}                                   // steerBack count is in-process per-(goalId, round), not persisted
+interface GoalGateState {
+  // .dsh/goal-verify-gate/goals/<goalId>.json
+  goalId: string;
+  gates: GateSpec[];
+  consecutiveFailedCompletions: number;
+  lastAttempt?: {
+    at: number;
+    allPassed: boolean;
+    reports: GateReport[];
+    forced: boolean;
+  };
+} // steerBack count is in-process per-(goalId, round), not persisted
 
-interface Config {                  // schemastery, following upstream plugin convention
-  mode?: GateMode                   // global default 'audit' (consistent with doc 02)
-  gateTimeoutMs?: number            // per-gate timeout, default 120_000
-  stall?: { afterConsecutiveFails?: number /* default 3, min 1 */, escalateViaAsk?: boolean /* default true */ }
-  steerBack?: { enabled?: boolean /* default true */, maxPerGoalRound?: number /* default 2 */,
-                completionPatterns?: string[] /* completion-wording regexes, bilingual Chinese/English, with a conservative default library */ }
+interface Config {
+  // schemastery, following upstream plugin convention
+  mode?: GateMode; // global default 'audit' (consistent with doc 02)
+  gateTimeoutMs?: number; // per-gate timeout, default 120_000
+  stall?: {
+    afterConsecutiveFails?: number /* default 3, min 1 */;
+    escalateViaAsk?: boolean; /* default true */
+  };
+  steerBack?: {
+    enabled?: boolean /* default true */;
+    maxPerGoalRound?: number /* default 2 */;
+    completionPatterns?: string[]; /* completion-wording regexes, bilingual Chinese/English, with a conservative default library */
+  };
 }
 ```
 
@@ -247,7 +261,7 @@ a STALL into a crash, doc 00 principle 2):
    assistant text matches `completionPatterns`.
 2. Cap check: `steerCount(goalId, roundsStarted) < maxPerGoalRound` →
    `agent.steer(createUserMessage({ content: <wording below>, source: {
-   kind:'plugin', plugin:'goal-verify-gate', form:'notice', summary } }))`,
+kind:'plugin', plugin:'goal-verify-gate', form:'notice', summary } }))`,
    increment the counter, emit `goal-verify-gate/steer-back` telemetry
    (info). Wording essentials: list the goal's gates, and demand "either
    call update_goal complete so the gates actually run, or retract the
@@ -311,7 +325,7 @@ signature freezes at M1.
   /goal-gate command + telemetry completion**: observer counting,
   consecutive tracking and ask escalation, the completionPatterns default
   library (bilingual Chinese/English) and steer injection, `/goal-gate
-  add|list|remove|reset`.
+add|list|remove|reset`.
   **Verify**: synthetic session — after consecutive failures reach the
   threshold, the next complete returns `ask` (a deployment without an
   approval backend deterministically degrades to deny, asserted per
@@ -405,7 +419,7 @@ files are touched.
 
 ---
 
-*Verified seams (paths and line numbers all re-verified on 2026-08-17)*:
+_Verified seams (paths and line numbers all re-verified on 2026-08-17)_:
 `packages/goal/tool-goal/src/index.ts:41-43 / :307-308 / :313-324`;
 `packages/goal/tool-goal/src/authority.ts:65-74 / :101-108`;
 `packages/goal/goal/src/index.ts:336-346 / :541-558`;
