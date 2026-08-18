@@ -2,6 +2,13 @@
 
 > 状态: design (not started) | Tier: 1 | 包: packages/verification/claim-contracts | 依赖: 01 tool-manifest
 
+## 设计目标与用户问题
+
+**目标**:在工具结果进入上下文、助手声明到达用户之前做代码级准入校验(schema 形状/新鲜度/出处/领域规则),并在轮末对助手声明做"supported / unsupported / unverifiable"三态审计。
+**用户问题**:用户无法信任 agent 的自述——"文件已创建""测试已通过"可能纯属编造,或建立在残缺、过期的工具结果上;脏数据一旦进入上下文就静默污染后续所有推理,错误要到很下游才暴露,而提示词层的"请诚实"从来不是承重墙。
+
+
+
 ## 动机(为什么必要 — 三层栈缺的一层)
 
 三层验证栈的三个面互相不可替代:01 tool-manifest 是 per-tool 元数据基座,

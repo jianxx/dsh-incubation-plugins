@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 1 | Package: packages/session/long-run-protocol | Dependencies: none (optional integration with 04)
 
+## Design goal and user problem
+
+**Goal**: provide a session protocol for tasks spanning hours and multiple context windows — an initializer that lands the init script + progress.md artifact, round-end enforcement of "incremental progress + a mergeable clean state", and, at context anxiety, a window swap without losing the task (fork reset + structured handoff continuation).
+**User problem**: in the back half of a long task the agent develop context anxiety: the compacted history makes it read "a lot got done" as "it's done", or it loops re-narrating old messages; when the user comes back they face a session that can neither explain its progress nor be picked up by any fresh session, so the only move left is starting over.
+
 ## Motivation (why this is necessary — two failure classes: one-shotting + premature completion)
 
 Effective Harnesses for Long-Running Agents identifies two structural failure

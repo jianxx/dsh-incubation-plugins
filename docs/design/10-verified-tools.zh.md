@@ -2,6 +2,11 @@
 
 > 状态: design (not started) | Tier: 3 | 包: packages/verification/verified-tools | 依赖: 01
 
+## 设计目标与用户问题
+
+**目标**:给副作用类工具补上可靠的执行语义——歧义失败(超时/无响应)先用后置条件探针判定"动作到底发生没有"再决定是否重试;确定性幂等键去重;工具参数在 pre-execute 做 schema 预校验。
+**用户问题**:网络稍微一抖,agent 就不知道 `gh pr create` 到底成没成:盲目重试造出两个 PR,或者把一个其实已经成功的动作当成失败放弃;参数格式错被远端拒了也读不懂错误——用户看到的是重复副作用、"明明成功了却说失败"、以及永远对不上的世界状态。
+
 针对「不可靠工具」的执行语义插件:围绕 `tools/execute` 包裹真实派发,提供
 幂等去重、歧义结果的「先验后重试」、以及工具参数的预校验准入。
 
@@ -26,7 +31,7 @@
 
 ## 现状与缺口
 
-已验证(dsh repo,`/Users/bytedance/workspace/github.com/deepseek-harness`,下称 dsh):
+已验证(上游仓库 `deepseek-harness`,下称 dsh;引用均为其仓内相对路径):
 
 1. **超时已以结构化 error 结果返回**:超时由插件
    `packages/guard/timeout-policy` 承担,产出普通 `ToolExecutionFailure`

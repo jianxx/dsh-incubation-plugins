@@ -2,6 +2,13 @@
 
 > Status: design (not started) | Tier: 1 (substrate) | Package: packages/verification/tool-manifest | Depends on: none (only cordis + dsh core types) | Consumers: 02 claim-contracts, 09 token-wall, 10 verified-tools
 
+## Design goal and user problem
+
+**Goal**: provide the single per-tool metadata registry (effect class / idempotency recipe / disclosure class / failure semantics) for every gate/verify-type plugin, with a builtin core-tool manifest, user overlays, and a fail-closed default for unknown tools.
+**User problem**: today, anyone adding "is this call safe / can it be retried" logic to the agent hand-rolls a hard-coded tool list; as those lists drift apart, the same tool is allowed in one place and blocked in another — the user faces self-contradicting behavior with no authoritative answer anywhere.
+
+
+
 ## Motivation (why it's needed)
 
 The three-layer verification stack (trace property / action gate / claim contract)

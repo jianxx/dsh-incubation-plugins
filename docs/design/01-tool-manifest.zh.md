@@ -2,6 +2,13 @@
 
 > 状态: design (not started) | Tier: 1(基座) | 包: packages/verification/tool-manifest | 依赖: 无(仅 cordis + dsh core 类型) | 消费者: 02 claim-contracts, 09 token-wall, 10 verified-tools
 
+## 设计目标与用户问题
+
+**目标**:为全部 gate/verify 类插件提供唯一的 per-tool 元数据注册表(效果分类/幂等配方/外泄分级/失败语义),内置核心工具清单 + 用户覆盖层,未知工具 fail-closed。
+**用户问题**:今天想给 agent 加任何"这个调用安不安全/能不能重试"逻辑的人,只能自造一份硬编码工具清单;多份清单各自漂移后,同一工具在一处被放行、另一处被拦截,用户面对的是互相矛盾的行为,且没有一处权威答案可查。
+
+
+
 ## 动机(为什么必要)
 
 三层验证栈(trace property / action gate / claim contract)与 TokenWall 类外泄防线,

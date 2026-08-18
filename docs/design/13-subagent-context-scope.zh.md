@@ -2,6 +2,11 @@
 
 > 状态: spike 已完成(结论: **feasible-plugin**,证据见下) | Tier: 3 | 包: packages/agents/subagent-context-scope(M0 判定:可行)| 依赖: 无(上游 `deepseek-harness` 提供全部接缝;doc 01/12 只做运行时可选集成)
 
+## 设计目标与用户问题
+
+**目标**:给派生子代理加上按需上下文边界——注册 scoped-fork / scoped-spawn provider 包装,按角色 policy 只携带必需的 prompt section、工具子集、记忆范围与 goal 子集;配泄漏度量 harness(合成干扰秘密场景)供 12 消费。
+**用户问题**:今天派一个子代理 = 把父会话的全部见闻——无关任务的讨论、探过的密钥、其他角色的中间推理——原样拷贝给它;子代理被干扰项带偏、答案质量掉,用户为两份上下文付双份 token,还多背一个信息泄漏面,而这一切没有任何配置入口。
+
 ## 动机(PerspectiveGap 数字 + 为何默认全貌拷贝是错的)
 
 PerspectiveGap 测量了多代理 prompt 编排中的信息泄漏:把干扰项/越权信息灌进角色

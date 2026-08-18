@@ -2,6 +2,13 @@
 
 > 状态: design (not started) | Tier: 1 | 包: packages/verification/trace-contracts | 依赖: 无(可选集成 01)
 
+## 设计目标与用户问题
+
+**目标**:用声明式的 per-task 契约(工具顺序/调用次数/参数约束/状态前置)在线管控工具轨迹——pre-execute 处 allow/deny/ask 且 deny 必带引用条款的恢复性反馈——并对会话轨迹做离线合规评分与 ToolFailBench 类别指标。
+**用户问题**:用户布置有流程纪律的任务时(先跑测试再提交、别碰这个目录、重试最多三次)只能靠提示词祈祷;轨迹一旦走形——跳过测试直接 commit、拿到报错继续声称成功——没有告警、没有拦截、事后也没有度量,用户只能凭直觉觉得"这次跑得不太对"。
+
+
+
 ## 动机
 
 Agent 的失败很多不是"答错",而是**轨迹走形**:跳过测试直接 commit(Tool-Skip)、
@@ -42,7 +49,7 @@ ASK 一律走上游 `approval/request` seam(overview 原则 1),standalone 可工
 
 ### 表面与接缝(verified + cited)
 
-以下均已直接读码确认(上游仓库 `/Users/bytedance/workspace/github.com/deepseek-harness`):
+以下均已直接读码确认(上游仓库 `deepseek-harness`,引用均为其仓内相对路径):
 
 1. **`tools/pre-execute` waterfall + PreToolDecision 三态**
    `packages/core/tools/src/index.ts:152`(listener 签名)与 `:588-591`:

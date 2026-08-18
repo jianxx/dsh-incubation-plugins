@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 2 | Package: packages/security/token-wall | Depends on: 01
 
+## Design goal and user problem
+
+**Goal**: run layered pre-transfer semantic auditing before sensitive content crosses a boundary — a deterministic precheck (secret entropy / egress allowlists / size caps) → a small auditor model inside the gray band (seeing only the fully assembled payload) → a per-sink-class arbiter configured off/audit/enforce — emitting structured audit reports.
+**User problem**: after the agent reads a poisoned web page or issue body, it can ride secrets or private code out of the repo inside an innocent-looking outbound payload (a search query, a PR body); every fragment looks benign on its own and only the assembled whole is lethal — today the user can only find out after the fact, with no review point before transfer and no accountable record afterwards.
+
 ## Motivation
 
 The attack surface of a persistent agent lies not in the "final action" but in every cross-boundary natural-language token flow: tool egress parameters, file writes destined for external publication, permission/credential changes, memory and rule writes (TokenWall). As long as injected content can hitchhike inside these flows, it can carry sensitive context out or escalate privileges — while each local fragment may look innocent in isolation. The compositional-harm paper proves that for a monitor seeing only local views, the ceiling on TPR−FPR is bounded by the TV distance between fragment distributions; **auditing must happen on the final assembled representation** (complete tool arguments / complete outbound payload), never per chunk. The design therefore adopts a layered pipeline: deterministic precheck (zero cost) → small-model auditor invoked only inside the gray band → an arbiter configured per sink class (off/audit/enforce; under enforce, gray cases go to ASK). Reference numbers reported by TokenWall: ASR 12.5%, benign pass 97.4%, +0.69s/case; and its experience is that **structured audit reports** (rather than bare allow/deny decisions) are what make defense-in-depth operable.

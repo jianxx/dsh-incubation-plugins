@@ -2,6 +2,13 @@
 
 > Status: design (not started) | Tier: 1 | Package: packages/verification/claim-contracts | Depends on: 01 tool-manifest
 
+## Design goal and user problem
+
+**Goal**: enforce code-level admission on tool results and assistant claims before they enter the context or reach the user (schema shape / freshness / provenance / domain rules), and audit assistant claims at end-of-turn into a three-way verdict: supported / unsupported / unverifiable.
+**User problem**: users cannot trust what the agent says — "file created" or "tests pass" may be fabricated outright or built on truncated, stale tool results; once dirty data enters the context it silently poisons every later inference, the error surfaces far downstream, and prompt-level "please be honest" has never been a load-bearing wall.
+
+
+
 ## Motivation (why this is needed — the missing layer of the three-layer stack)
 
 The three faces of the three-layer verification stack are not substitutable for

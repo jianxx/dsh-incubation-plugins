@@ -2,6 +2,11 @@
 
 > 状态: design (not started) | Tier: 1 | 包: packages/session/long-run-protocol | 依赖: 无(可选集成 04)
 
+## 设计目标与用户问题
+
+**目标**:为跨多小时、跨多个上下文窗口的任务提供一份会话协议——initializer 落地 init 脚本 + progress.md 工件、每轮收尾强制"增量进展 + 可合并的干净状态"、上下文焦虑时换窗不换事(fork reset + 结构化 handoff 续接)。
+**用户问题**:长任务跑到后半段,agent 开始上下文焦虑:压缩后的历史让它把"干了不少"误读成"干完了",或在原地反复重述旧消息;用户回来时面对的是一团既讲不清进度、也无法被任何新会话接续的状态,只能推倒重来。
+
 ## 动机(为什么必要 — 一次性打完 + 提前完工两类失败)
 
 Effective Harnesses for Long-Running Agents 指证了长跑会话的两类结构性失败:

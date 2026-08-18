@@ -2,6 +2,13 @@
 
 > Status: design (not started) | Tier: 1 | Package: packages/goals/goal-verify-gate | Depends on: none (optional integration with 03)
 
+## Design goal and user problem
+
+**Goal**: gate the goal's `complete` transition behind verification gates that must actually execute and pass (command exit codes / file existence and content / session-event evidence); a failing gate leaves the goal active (STALL) — completion can never be claimed without evidence — and repeated failures escalate to an ASK for the user at a configurable threshold.
+**User problem**: the agent declaring "done" costs it nothing — today a /goal's completion is pure model self-discipline, and the user only discovers the gap between "announced complete" and reality afterwards; in unattended long runs, fabricated completion is the most expensive failure mode there is.
+
+
+
 ## Motivation (why this is necessary — DONE gate / anti-false-completion / the third layer of three-layer state recovery)
 
 doc 00's three-layer state recovery: resumable event stream (session log replay,

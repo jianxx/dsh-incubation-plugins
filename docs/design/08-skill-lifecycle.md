@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 2 | Package: packages/skills/skill-lifecycle | Dependencies: none
 
+## Design goal and user problem
+
+**Goal**: make skill packages governed runtime artifacts — admission lint (shape / resource completeness / permission compatibility / injection-style instruction safety), utility tracking (candidate → active → archived state machine), versioned rollback storage, and provenance records.
+**User problem**: skill directories only ever grow: SKILL.md files copied from elsewhere are never reviewed, so a bad skill carrying injection-style instructions or demanding out-of-scope tools meets zero interception; once installed, nobody knows which ones are actually used or which are actively hurting; a broken edit cannot be rolled back — the bigger the library, the bigger the retrieval interference and supply-chain risk, and none of it is visible today.
+
 ## Motivation
 
 The Dynamic Agent Skills survey splits skills into an eight-stage lifecycle

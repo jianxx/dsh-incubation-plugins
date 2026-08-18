@@ -2,6 +2,11 @@
 
 > 状态: design (not started) | Tier: 2 | 包: packages/memory/rules-lifecycle | 依赖: 无
 
+## 设计目标与用户问题
+
+**目标**:把用户的纠偏沉淀为版本化的行为规则工件(行为规则/代码标准/自检清单/反模式/工作流五段),带候选→生效→归档状态机、复发追踪与定期收敛合并,注入有字节预算上限。
+**用户问题**:用户每周都在对 agent 重复同一批纠正("别动 vendor/""commit 前先跑 lint");纠正从不沉淀,或沉淀进 CLAUDE.md 后只增不减——几个月后 prompt 被无限积累的规则噪声淹没,真正重要的规则反而被模型忽略,而被纠正过的错误照样复发。
+
 ## 动机
 
 - **SSCA**(Self-Improving Coding Agents Through Accumulated Rules)给出已验证的生产闭环:

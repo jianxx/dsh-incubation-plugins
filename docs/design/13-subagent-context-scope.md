@@ -2,6 +2,11 @@
 
 > Status: spike: done (verdict: **feasible-plugin**, evidence below) | Tier: 3 | Package: packages/agents/subagent-context-scope (M0 verdict: feasible) | Dependencies: none (upstream `deepseek-harness` provides every seam; doc 01/12 are runtime-optional integrations only)
 
+## Design goal and user problem
+
+**Goal**: add need-only context boundaries to spawned subagents — register scoped-fork / scoped-spawn provider wrappers that carry only the prompt sections, tool subsets, memory scopes, and goal subsets a role policy declares necessary; ship a leakage-measurement harness (synthetic distractor-secret scenarios) feeding doc 12.
+**User problem**: spawning a subagent today means copying the parent session's entire memory — discussions of unrelated tasks, secrets that were probed, other roles' intermediate reasoning — verbatim into the child; the child gets derailed by distractors, answer quality drops, the user pays double tokens for two contexts, and picks up an information-leakage surface on top, with no configuration entry point for any of it.
+
 ## Motivation (PerspectiveGap Numbers + Why the Default Full-History Copy Is Wrong)
 
 PerspectiveGap measured information leakage in multi-agent prompt orchestration: after

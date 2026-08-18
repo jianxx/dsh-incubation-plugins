@@ -2,6 +2,11 @@
 
 > 状态: design (not started) | Tier: 3 | 包: packages/eval/eval-harness + scripts/bench/ | 依赖: 03, 11 的事件 schema
 
+## 设计目标与用户问题
+
+**目标**:给本仓库自身铺一条演化信用铁轨——任何"插件 X 提升了效果"的论断必须过:budget-matched 对照、validity/activation/significance 三道确定性门、held-out 选拔 + sealed test 只评一次、被接受 patch 按 (where × why) 病理归档。
+**用户问题**:本仓全部 13 个工作项都在改同一个 harness,贡献者和维护者今天没有任何机制区分真提升与 search-budget 伪影——一个"演化有效"的 PR 可能只是多花了 token;没有这条铁轨,这个以"harness 演化"为主题的仓库自身就在实践它没有纪律的反面教材。
+
 ## 动机(Rethinking 的 67.4<72.3 警示: 没有纪律的演化是 search-budget 自欺欺人)
 
 本仓库的全部工作项 (docs 01–13) 都在演化同一个 harness: 01/02/03 立验证栈、04/05/06 驱动长程任务、07/08/09 治理——每个插件都是一个"harness patch"。这个仓库自己的论点(观测驱动的 harness 演化)必须向内兑现: 没有信用纪律,这些演化只是 search-budget 的自我感动。

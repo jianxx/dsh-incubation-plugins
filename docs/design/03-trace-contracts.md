@@ -2,6 +2,13 @@
 
 > Status: design (not started) | Tier: 1 | Package: packages/verification/trace-contracts | Depends on: none (optional integration with 01)
 
+## Design goal and user problem
+
+**Goal**: govern the tool trajectory online with declarative per-task contracts (tool order / call counts / argument constraints / state preconditions) — allow/deny/ask at pre-execute, with deny always carrying a recovery-channel message quoting the violated clause — plus offline compliance scoring with ToolFailBench-category metrics.
+**User problem**: when a user assigns a task with process discipline (run tests before committing, don't touch this directory, retry at most three times), the only enforcement today is a hopeful prompt; once the trajectory goes off the rails — committing without tests, claiming success over an error result — there is no alert, no interception, and no after-the-fact measurement, leaving the user with a gut feeling that "that run went wrong somehow".
+
+
+
 ## Motivation
 
 Many agent failures are not "wrong answers" but **trajectory deformation**:
@@ -56,7 +63,7 @@ and works standalone.
 ### Surfaces and seams (verified + cited)
 
 All items below are confirmed by direct code reading (upstream repo
-`/Users/bytedance/workspace/github.com/deepseek-harness`):
+`deepseek-harness`; all citations are repo-relative paths):
 
 1. **`tools/pre-execute` waterfall + the PreToolDecision three-state**
    `packages/core/tools/src/index.ts:152` (listener signature) and `:588-591`:

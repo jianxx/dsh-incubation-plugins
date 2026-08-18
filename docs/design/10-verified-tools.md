@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 3 | Package: packages/verification/verified-tools | Depends on: 01
 
+## Design goal and user problem
+
+**Goal**: give side-effecting tools reliable execution semantics — on ambiguous failure (timeout / no response) probe the intended postcondition to decide whether the action already happened before ever retrying; deduplicate with deterministic idempotency keys; schema-validate tool arguments at pre-execute.
+**User problem**: at the slightest network wobble the agent cannot tell whether `gh pr create` actually succeeded: it retries blindly and creates two PRs, or abandons an action that in fact succeeded; a malformed argument rejected by the remote end is misread — what the user sees is duplicate side effects, "it worked but the agent says it failed", and a world state that never lines up.
+
 An execution-semantics plugin for "unreliable tools": it wraps the real dispatch
 around `tools/execute`, providing idempotent dedup, verify-before-retry for
 ambiguous outcomes, and pre-validation admission of tool arguments.
@@ -36,7 +41,7 @@ Literature anchors and their implications:
 
 ## Current State and Gaps
 
-Verified (dsh repo, `/Users/bytedance/workspace/github.com/deepseek-harness`,
+Verified (upstream repo `deepseek-harness`,
 referred to below as dsh):
 
 1. **Timeouts are already returned as structured error results**: timeouts are

@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 3 | Package: packages/observability/silent-failure-watch | Dependencies: none (schema consumed by doc 12)
 
+## Design goal and user problem
+
+**Goal**: detect, with online read-only probes, the failure class where the process never crashes and every log line is legal but the narrative has already diverged from reality (result-ignore / output-fabrication / context pollution / plan drift / idle-spinning jobs) — plus an offline fault-injection reproduce → intervene → confirm loop — all emitting structured telemetry flags.
+**User problem**: what is dangerous is not the agent crashing, but the agent not crashing while being wrong all along: tool errors silently stepped over, never-run tests written into the summary, a scheduled job spinning empty for weeks — to the user every log line "looks fine", by the time downstream blows up there is no way to locate the step where the lying started, and no way to verify that a fix actually retires the same pit.
+
 ## Motivation (why pass/fail logs miss the most dangerous class of production bugs)
 
 The most common severe agent failures in production are not crashes, but **failures

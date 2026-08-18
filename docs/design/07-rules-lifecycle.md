@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 2 | Package: packages/memory/rules-lifecycle | Depends on: none
 
+## Design goal and user problem
+
+**Goal**: sediment user corrections into a versioned behavioral-rules artifact (five sections: behavioral rules / code standards / self-review checklist / anti-patterns / workflow rules), with a candidate → active → archived state machine, recurrence tracking, periodic consolidation, and a hard byte budget on prompt injection.
+**User problem**: users repeat the same corrections to the agent every week ("don't touch vendor/", "run lint before committing"); corrections either never sediment at all, or sediment into CLAUDE.md and only ever grow — months later the prompt is drowned in accumulated rule noise, the rules that actually matter get ignored by the model, and the very errors that were corrected keep recurring.
+
 ## Motivation
 
 - **SSCA** (Self-Improving Coding Agents Through Accumulated Rules) demonstrates a

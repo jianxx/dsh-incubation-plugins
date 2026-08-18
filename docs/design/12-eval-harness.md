@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 3 | Packages: packages/eval/eval-harness + scripts/bench/ | Depends on: the event schemas of 03, 11
 
+## Design goal and user problem
+
+**Goal**: lay a credit-discipline rail for this repository itself — any claim that "plugin X improved outcomes" must pass: budget-matched baselines, the three deterministic gates validity/activation/significance, held-out selection with a sealed test evaluated exactly once, and accepted patches archived by (where × why) pathology.
+**User problem**: all 13 work items in this repo modify the same harness, and today neither contributors nor maintainers have any mechanism to separate a real improvement from a search-budget artifact — a PR claiming "evolution worked" may simply have spent more tokens; without this rail, a repo whose entire theme is harness evolution is itself practicing the undisciplined counterexample.
+
 ## Motivation (Rethinking's 67.4<72.3 warning: undisciplined evolution is search-budget self-deception)
 
 Every work item in this repo (docs 01–13) evolves the same harness: 01/02/03 build the verification stack, 04/05/06 drive long-horizon tasks, 07/08/09 govern — every plugin is a "harness patch". This repo's own thesis (observation-driven harness evolution) must be honored inwardly: without credit discipline, these evolutions are nothing but search-budget self-congratulation.

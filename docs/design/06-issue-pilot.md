@@ -2,6 +2,11 @@
 
 > Status: design (not started) | Tier: 1 | Package: packages/control-plane/issue-pilot | Depends on: 01, 04, 05
 
+## Design goal and user problem
+
+**Goal**: pin the agent control plane at issue granularity — one worktree, one session, one budget per issue under a rate-limited concurrency state machine, a WORKFLOW.md flow contract, CI results and review comments flowing back automatically as continue/fix instructions, with output measured in landed PRs and throughput.
+**User problem**: a team or individual who wants an agent to plow through an issue queue is stuck with "one human watching one chat box": which issue is being worked, where it's stuck, and how many tokens it burned are all tracked by hand; loosen the concurrency even slightly and runs stomp on each other's workspaces, and when one fails there is no recovery path — the throughput ceiling is human attention, not the machine.
+
 ## Motivation
 
 A production-grade agent control plane is anchored not at chat-session granularity but at
@@ -38,7 +43,7 @@ Gaps:
 
 ### Surfaces and seams (verified + cited)
 
-The following source repository root: `$DSH = /Users/bytedance/workspace/github.com/deepseek-harness`.
+The following source repository root: `$DSH` = the upstream `deepseek-harness` repository root; all citations are repo-relative paths.
 
 | Seam | Verified surface | Source |
 |---|---|---|

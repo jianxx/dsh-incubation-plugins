@@ -1,6 +1,6 @@
 # Incubation design specs — index
 
-设计来源:`llm-wiki/wiki/syntheses/agent-runtime-harness-systems.md`(agent runtime/harness 综述)
+设计来源:agent runtime/harness 领域的文献综合(《Agent Runtime and Harness Systems: From Session Scripts to Agent-Native Serving Plane》)
 对 `deepseek-harness`(dsh 核心)+ `dsh-cc-plugins`(CC parity 插件集)的缺口分析,经独立评审修订。
 每篇文档对应一个孵化工作项,按实现粒度切分为 PR 级里程碑。编号即构建顺序。
 

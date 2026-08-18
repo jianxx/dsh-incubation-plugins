@@ -2,6 +2,11 @@
 
 > 状态: design (not started) | Tier: 2 | 包: packages/skills/skill-lifecycle | 依赖: 无
 
+## 设计目标与用户问题
+
+**目标**:让技能包成为可治理的运行时工件——准入 lint(形状/资源完整/权限兼容/注入式指令安全)、效用追踪(candidate→active→archived 状态机)、可回滚的版本化存储与出处记录。
+**用户问题**:技能目录只会越堆越多:从外面拷来的 SKILL.md 没人审,混进去一个带注入式指令或越权工具要求的坏技能没有任何拦截面;装上之后没人知道哪些真的在用、哪些在帮倒忙;改坏了没法回滚——技能库越大,检索干扰和供应链风险越大,而这一切今天完全不可见。
+
 ## 动机
 
 Dynamic Agent Skills 综述把技能拆成八段 lifecycle(evidence acquisition、proposal、

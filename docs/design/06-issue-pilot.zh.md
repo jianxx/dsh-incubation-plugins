@@ -2,6 +2,11 @@
 
 > 状态: design (not started) | Tier: 1 | 包: packages/control-plane/issue-pilot | 依赖: 01, 04, 05
 
+## 设计目标与用户问题
+
+**目标**:把 agent 控制面钉在 issue 粒度——每个 issue 一个独立 worktree + 独立会话 + 独立预算的限流并发状态机,WORKFLOW.md 作为流程契约,CI 与评审意见自动回流为继续/修正指令,产出以 landed PR 与吞吐计量。
+**用户问题**:想让 agent 批量消化 issue 队列的团队或个人,今天的交互形态是"一个人盯一个聊天框":谁在做哪个 issue、卡在哪一步、烧了多少 token 全靠人肉记;并发稍一放开就互相踩 workspace,失败了没有恢复路径——吞吐的上限是人盯人的注意力,不是机器。
+
 ## 动机
 
 生产级 agent 控制面的锚点不在聊天会话粒度,而在 **issue/task 粒度**(Symphony 的核心教训:
@@ -35,7 +40,7 @@ branch/worktree,上下文隔离,仅 shepherd 处汇总);(3) WORKFLOW.md(YAML fro
 
 ### 表面与接缝(verified + cited)
 
-以下来源仓库根:`$DSH = /Users/bytedance/workspace/github.com/deepseek-harness`。
+以下来源仓库根:`$DSH` = 上游 `deepseek-harness` 仓库根(引用均为其仓内相对路径)。
 
 | 接缝 | 已核实表面 | 出处 |
 |---|---|---|

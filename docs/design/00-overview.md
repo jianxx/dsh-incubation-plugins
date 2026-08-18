@@ -1,8 +1,9 @@
 # Incubation design specs — index
 
 Source: gap analysis of `deepseek-harness` (dsh core) + `dsh-cc-plugins` (the
-CC-parity plugin set) against `llm-wiki/wiki/syntheses/agent-runtime-harness-systems.md`
-(the agent runtime/harness synthesis), revised after an independent review pass.
+CC-parity plugin set) against the agent runtime/harness literature synthesis
+("Agent Runtime and Harness Systems: From Session Scripts to Agent-Native
+Serving Plane"), revised after an independent review pass.
 Each document is one incubation work item, split into PR-sized milestones.
 Number order is the build order.
 
