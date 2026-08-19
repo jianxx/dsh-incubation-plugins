@@ -25,6 +25,8 @@ CC hook 桥、会话持久化/fork/resume。
 
 CRAB 式 OS checkpoint(sandbox 内部)、PatchOptic authority triple(运行时准入代数)、
 KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多用户协作。
+记忆轴上另明确不做:记忆引擎本体(向量/图存储构造),以及训练侧记忆
+(参数化/梯度存储、KV-cache 记忆、训练路由器)——属引擎或训练设施,不是 harness 插件。
 
 ## 共享设计原则(所有工作项遵守)
 
@@ -77,6 +79,12 @@ KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多
 | 21 | [domain-pack](21-domain-pack.md) | 3 | science/domain-pack | 01, 05, 08 | Vibe-FDTR(消融 98.9%→36.7%), TRACE |
 | 22 | [breeding-genomics-toolkit](22-breeding-genomics-toolkit.md) | 3 | breeding/genomics-toolkit | 21, 16, 18, 10 | Vibe-FDTR(领域封装), Prompt-to-Paper |
 | 23 | [breeding-data-adapters](23-breeding-data-adapters.md) | 3 | breeding/data-adapters | 21 | SciHorizon-DataEVA(数据就绪) |
+| 24 | [memory-bench-pack](24-memory-bench-pack.md) | 3(记忆波次门控;扩展 12) | eval/memory-bench-pack | 12 | StratMem-Bench, Stored Evidence(Pass@B/P90R), Veracium, MemLeak, Setoka, PM-Bench |
+| 25 | [episodic-session-memory](25-episodic-session-memory.md) | 2 | memory/episodic-session-memory | 24(门控);边界 05 | HLTM, E-mem, InMind, Selective Persistent Memory |
+| 26 | [memory-write-gate](26-memory-write-gate.md) | 2 | memory/write-gate | 24(基线门控);08 先例 | MemRouter(仅概念), Selective Persistent Memory, ConsistencyGate, DMF, MemSIF |
+| 27 | [memory-maintenance](27-memory-maintenance.md) | 3 | memory/maintenance | 25(记录封套), 26, 07 | MEMOREPAIR, MemStrata, OBLIVION, Veracium, Agent-Memory-≠-Database, ChronoMem |
+| 28 | [prospective-memory](28-prospective-memory.md) | 2 | session/prospective-memory | 24(评分) | PM-Bench, PMMC |
+| 29 | [memory-guardian](29-memory-guardian.md) | 3(门控于真实多人写入) | security/memory-guardian | 26, 25;边界 13/09 | MemGuard, SafeHarbor, MemGate/MemPoison(威胁模型), RBI-Eval |
 
 ## 构建顺序与合并策略
 
@@ -90,6 +98,8 @@ KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多
 15/17 ──► 16 ;17 ──► 18
 01 ──► 19 ──► 20
 01/05/08 ──► 21 ──► 22,23
+24 门控整条记忆波次(先出基线);24 ──► 26, 28
+25 ──► 27 ;26 ──► 27, 29 ;07 ──► 27
 ```
 
 14 为总纲不占构建位。
@@ -100,6 +110,10 @@ KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多
 - **第四波**(纵深):10, 11, 12;13 看 spike 结论
 - **科研 W1**(分析与谱系底座):15 – 18(15/17 先行,详见 [14 号总纲](14-science-agent-overview.md))
 - **科研 W2**(证据治理与领域落地):19 – 23;更远的 W3 roadmap 仅列出不立项
+- **记忆 W0**(基线门控):24 —— 扩展 12 的评测包;基线未出之前任何记忆项不得 ship
+- **记忆 W1**(召回):25 —— 其 M0 spike 即该项自身的 go/no-go
+- **记忆 W2**(控制):26 → 27(先写入侧门,再养护修复)
+- **记忆 W3**(意图与治理):28;29 保持门控,待真实多人写入的记忆 overlay 出现
 
 ## 毕业标准(incubation → dsh-cc-plugins 或上游)
 

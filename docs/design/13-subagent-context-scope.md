@@ -272,6 +272,11 @@ collect:
   serve as a security boundary; the policy is a leakage-reduction and quality lever, not a
   replacement for permissions (permissions are pinned by `DelegatedPolicyOverrides`'s approval
   `'never'`, child-agent.ts:186, verified).
+
+  Boundary with 29 memory-guardian: whether a child agent may **see** memory is
+  THIS doc's scoped policy; what gets **written/shared** into memory across
+  agents (admission, type contamination, overlay consistency) belongs to 29
+  (gated on real multi-writer use).
 - **R4 Timing gap with doc 01**: before doc 01 lands, `dropContentPatterns` serves as the
   inline fallback; after it lands, migrate to the tool-manifest exfiltration taxonomy (shared
   principle 4), dual-reading during migration.

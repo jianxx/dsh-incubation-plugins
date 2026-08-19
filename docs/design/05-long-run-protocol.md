@@ -384,6 +384,11 @@ issue**(an independent `.dsh/longrun/` under an independent cwd), consuming
 three external contracts: the commands, the progress.md file schema, and
 the telemetry op vocabulary. 05 has no notion of "issue".
 
+Boundary with 25 episodic-session-memory: progress.md is task-scoped and
+disposable (a handoff artifact inside one run); 25's episode cards are
+session-scoped, indexed, and citable. 25 ingests completed progress.md files
+as one episode source instead of extracting a parallel record.
+
 ## Milestone split
 
 **M1: `/longrun init` + progress schema + prompt section + unit tests.**

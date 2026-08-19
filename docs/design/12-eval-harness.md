@@ -31,7 +31,7 @@ Verified (upstream dsh repo `/deepseek-harness`):
 
 Gaps: (a) no task registry and no trial-transcript normalization layer — session.jsonl is a runtime artifact, not an evaluation artifact; (b) no budget-matched comparison mechanism, so any claim that "plugin X improved outcomes" is currently unverifiable; (c) no train/held-out/sealed split and sealing; (d) no pathology archive for accepted patches. docs 03 (trace-compliance metrics) and 11 (silent-failure flags) will provide the L2 process-metric schemas; this doc is written as their consumer-side seam (and runs in degraded mode before they land).
 
-Scope honesty: this doc is **not** a general-purpose benchmark suite. It is the rail for this repo's evolution credit. L3 (model-graded rubric) and L4 (human) graders are optional and absent by default. Explicitly out of scope: creating a new public benchmark, a cross-repo general evaluation framework, a model-comparison portal.
+Scope honesty: this doc is **not** a general-purpose benchmark suite. It is the rail for this repo's evolution credit. L3 (model-graded rubric) and L4 (human) graders are optional and absent by default. Explicitly out of scope: creating a new public benchmark, a cross-repo general evaluation framework, a model-comparison portal. The memory bench pack (doc 24) extends THIS rail as a milestone family (availability-vs-use, tenure-crossover, delete-leak), adding task packs rather than a new harness.
 
 ## Design
 

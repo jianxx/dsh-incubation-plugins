@@ -252,3 +252,6 @@ Config = {
    以 audit 实跑数据调阈,block 规则保持少而准;jailbreak 级对抗不属于本包目标。
 8. **非目标(显式)**:运行时技能组合 / 检索 rerank(SkillCorpus 式)与离线技能合成 —
    均不做;覆盖与收益判定作为 follow-up,由 doc 12 eval-harness 提供 held-out 度量后再议。
+9. **相邻记忆项**:25 的 失败 episode→技能候选 晋升桥从本文档的准入路径进入
+   (candidate gating + lint,不走旁门);26 memory-write-gate 复用本文档的
+   rejected-contentHash 先例作为其隔离集合。

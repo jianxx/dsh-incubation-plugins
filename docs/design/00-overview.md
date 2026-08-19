@@ -30,7 +30,10 @@ session persistence/fork/resume.
 
 CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
 (runtime admission algebra), KV reuse / speculative decoding / WorkflowCompile
-(serving plane), TUI, auto-update, multi-user collaboration.
+(serving plane), TUI, auto-update, multi-user collaboration. On the memory axis:
+memory ENGINES themselves (vector/graph store construction), and training-side
+memory (parametric/gradient stores, KV-cache memory, trained write routers) —
+engine or training infrastructure, not harness plugins.
 
 ## Shared design tenets (binding for every work item)
 
@@ -93,6 +96,12 @@ CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
 | 21  | [domain-pack](21-domain-pack.md)                       | 3               | science/domain-pack                | 01, 05, 08    | Vibe-FDTR (ablation 98.9%→36.7%), TRACE                                |
 | 22  | [breeding-genomics-toolkit](22-breeding-genomics-toolkit.md) | 3         | breeding/genomics-toolkit          | 21, 16, 18, 10 | Vibe-FDTR (domain packaging), Prompt-to-Paper                         |
 | 23  | [breeding-data-adapters](23-breeding-data-adapters.md) | 3               | breeding/data-adapters             | 21            | SciHorizon-DataEVA (data readiness)                                    |
+| 24  | [memory-bench-pack](24-memory-bench-pack.md)           | 3 (memory wave gate; extends 12) | eval/memory-bench-pack | 12            | StratMem-Bench, Stored Evidence (Pass@B/P90R), Veracium, MemLeak, Setoka, PM-Bench |
+| 25  | [episodic-session-memory](25-episodic-session-memory.md) | 2             | memory/episodic-session-memory     | 24 (gated); boundary 05 | HLTM, E-mem, InMind, Selective Persistent Memory               |
+| 26  | [memory-write-gate](26-memory-write-gate.md)           | 2               | memory/write-gate                  | 24 (baseline gate); 08 precedent | MemRouter (concept only), Selective Persistent Memory, ConsistencyGate, DMF, MemSIF |
+| 27  | [memory-maintenance](27-memory-maintenance.md)         | 3               | memory/maintenance                 | 25 (record envelope), 26, 07 | MEMOREPAIR, MemStrata, OBLIVION, Veracium, Agent-Memory-≠-Database, ChronoMem |
+| 28  | [prospective-memory](28-prospective-memory.md)         | 2               | session/prospective-memory         | 24 (scoring)  | PM-Bench, PMMC                                                        |
+| 29  | [memory-guardian](29-memory-guardian.md)               | 3 (gated on real multi-writer use) | security/memory-guardian | 26, 25; boundary 13/09 | MemGuard, SafeHarbor, MemGate/MemPoison (threat model), RBI-Eval |
 
 ## Build order and merge strategy
 
@@ -106,6 +115,8 @@ CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
 15/17 ──► 16 ; 17 ──► 18
 01 ──► 19 ──► 20
 01/05/08 ──► 21 ──► 22, 23
+24 gates the whole memory wave (baseline first); 24 ──► 26, 28
+25 ──► 27 ; 26 ──► 27, 29 ; 07 ──► 27
 ```
 
 14 is a charter and takes no build slot.
@@ -118,6 +129,12 @@ CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
   [14 charter](14-science-agent-overview.md))
 - **Science W2** (evidence governance & domain landing): 19 – 23; the farther
   W3 roadmap is listed only, not chartered
+- **Memory W0** (baseline gate): 24 — a bench pack extending 12; no memory item
+  ships before its baseline reports
+- **Memory W1** (recall): 25 — its M0 spike is a go/no-go for the item itself
+- **Memory W2** (control): 26 → 27 (write-side gate first, then maintenance)
+- **Memory W3** (intent & governance): 28; 29 stays gated until a real
+  multi-writer memory overlay exists
 
 ## Graduation criteria (incubation → dsh-cc-plugins or upstream)
 

@@ -285,6 +285,10 @@ reset。二者共存:reset 之后新的子会话照样受 compaction 保护(其 
 05 会话**(独立 cwd 下独立 `.dsh/longrun/`),消费三样对外契约:命令、
 progress.md 文件 schema、telemetry op 词汇。05 不感知"issue"概念。
 
+与 25 episodic-session-memory 的边界:progress.md 是任务级、可弃的(单次 run 内的
+交接工件);25 的 episode card 是会话级、可索引、可引用的。25 消费完成态 progress.md
+作为 episode 源之一,不做平行抽取。
+
 ## 里程碑切分
 
 **M1: `/longrun init` + progress schema + prompt section + unit tests。**

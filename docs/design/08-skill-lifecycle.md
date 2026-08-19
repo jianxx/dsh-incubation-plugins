@@ -342,3 +342,7 @@ Each M is an independently mergeable PR (scaffolded from
    (SkillCorpus-style) and offline skill synthesis — both not done; coverage
    and payoff judgments are follow-ups, to be revisited once the doc 12
    eval-harness provides held-out measurement.
+9. **Adjacent memory items**: doc 25's failure-episode→skill promotion bridge
+   enters through THIS doc's admission path (candidate gating + lint, not a
+   side door); doc 26 memory-write-gate reuses this doc's rejected-contentHash
+   precedent for its quarantine set.

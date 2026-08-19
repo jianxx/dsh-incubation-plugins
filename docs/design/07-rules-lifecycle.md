@@ -56,6 +56,11 @@ again". This plugin neither reads nor writes cc-plugins memory files; if integra
 is ever built, it may only read-reference them inside the consolidation prompt,
 which does not constitute a dependency.
 
+Adjacent memory items: the candidate→active→archived lifecycle machinery in the
+consolidation flow is the named extraction candidate for 27 memory-maintenance
+(applied there to facts, not rules); 26 memory-write-gate complements this doc's
+consolidation — quality admission for facts, never a gate on human-reviewed rules.
+
 ## Design
 
 ### Surfaces and Seams (verified + cited)

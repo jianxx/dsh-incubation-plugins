@@ -44,6 +44,10 @@ exposure/recurrence 统计的**规则**工件。两者可共存:memory 回答"�
 rules 回答"这个团队犯过什么错、以后不许再犯"。本插件不读也不写 cc-plugins 的
 memory 文件;若未来做集成,只允许在 consolidation prompt 中只读引用,不构成依赖。
 
+相邻记忆项:consolidation 流中的 候选→激活→归档 生命周期机是 27 memory-maintenance
+的具名提取候选(那里作用于事实而非规则);26 memory-write-gate 与本插件的
+consolidation 互补——它管事实的准入质量,永不门控经人工审阅的规则。
+
 ## 设计
 
 ### 表面与接缝(verified + cited)

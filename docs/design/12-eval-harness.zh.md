@@ -31,7 +31,7 @@ Demystifying Evals 补齐工程面:task/trial/grader/transcript/outcome 五个�
 
 缺口: (a) 没有 task registry 与 trial transcript 规范化层——session.jsonl 是运行工件,不是评测工件;(b) 没有 budget-matched 比较机制,任何"插件 X 提升了效果"的论断目前都无法复核;(c) 没有 train/held-out/sealed 划分与封存;(d) 没有被接受 patch 的病理归档。docs 03(trace 合规指标)与 11(silent-failure 旗标)将给出 L2 过程度量的 schema,本文按它们的消费方写接缝(着陆前跑降级模式)。
 
-范围诚实: 本文**不是**通用 benchmark 套件。它是本仓库演化信用的铁轨(rail)。L3(model-graded rubric)与 L4(人工)grader 可选、默认缺席。明确不做: 新建公开 benchmark、多仓库通用评测框架、模型横评门户。
+范围诚实: 本文**不是**通用 benchmark 套件。它是本仓库演化信用的铁轨(rail)。L3(model-graded rubric)与 L4(人工)grader 可选、默认缺席。明确不做: 新建公开 benchmark、多仓库通用评测框架、模型横评门户。记忆评测包(doc 24)作为 milestone 族**扩展本轨道**(availability-vs-use、tenure-crossover、delete-leak),只加任务包,不另造评测器。
 
 ## 设计
 

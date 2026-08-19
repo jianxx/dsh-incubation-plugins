@@ -224,6 +224,9 @@ PerspectiveGap 风味的场景包:每个场景 = 父会话脚本化 transcript(�
 - **R3 角色解析的诚实性**:`label` 是模型/调用方自报,不能当安全边界;policy 是减泄漏
   与提质量手段,不替代权限(权限由 `DelegatedPolicyOverrides` 的 approval `'never'` 钉住,
   child-agent.ts:186,已验证)。
+
+  与 29 memory-guardian 的边界:子代理**能看多什么**记忆属本文档的 scope policy;跨 agent
+  的记忆**写入/共享**治理(准入、类型污染、overlay 一致性)归 29(门控于真实多人写入)。
 - **R4 与 doc 01 的时间差**:doc 01 未落地前 `dropContentPatterns` 内联兜底;落地后
   迁移至 tool-manifest 外泄分类(共享原则 4),迁移期双读。
 - **开放问题**:continuable 子的投影种子在冷恢复后是否应随父会话增长重投影(当前
