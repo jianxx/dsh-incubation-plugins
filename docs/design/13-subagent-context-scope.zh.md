@@ -1,6 +1,7 @@
 # 13 subagent-context-scope — 子代理按需上下文边界(spike 先行)
 
 > 状态: spike 已完成(结论: **feasible-plugin**,证据见下) | Tier: 3 | 包: packages/agents/subagent-context-scope(M0 判定:可行)| 依赖: 无(上游 `deepseek-harness` 提供全部接缝;doc 01/12 只做运行时可选集成)
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -33,6 +34,12 @@ provider 注册表对第三方插件开放。唯一真实的限制:`ctx.sessions
 纯切片 seam(与 subagent 种子无涉),one-shot 子代理的 creation window 没有插件钩子
 (可在 M1 用公开 API 自行组驱动绕过,见 Q2)。
 
+rc.7 关于已发布外部 provider 的注记:`subagent-claude-code` 与 `subagent-codex`
+在 rc.7 获得了 `run_in_background`(Job registry 支撑:`backgroundMode: 'one-shot'`;
+显式 `true` 返回父代理持有的 Job id,经 `job_output`/`job_kill` 消费),且二者均为
+显式 OPT-IN 挂载——生产 dsh 不安装它们(`apps/cli/config/agent-presets/standard/agent.cordis.yml`
+中 `disabled: true` 工具行及 "Production dsh does not install these optional providers" 注释)。
+
 ### Q1: 子代理 spawn 时拿到什么上下文?覆盖点在哪?
 
 **fork 路径(进程内 fork)**:
@@ -50,11 +57,11 @@ provider 计算**,service 层不参与挑选。
 `startInProcessRun(request, {seed})`:解析深度 → 捕获委托策略(approval 钉死 `'never'`)
 → `parent.ctx.agents.create({sessionId, meta, seed, agentOptions, signal, setup})`,其中
 `setup(childCtx)`(:120-130)调用 `applyChildComposition`:
-`packages/subagent/subagent/src/child-agent.ts:163-175` ——
+`packages/subagent/subagent/src/child-agent.ts:163-174` ——
 (1) `agentPresets.composeFrom(childCtx, parent.ctx)` 加入父 preset;
 (2) 注册 `subagent:delegation` 运行期上下文(order 120);
-(3) 有 `persona` 则注册同名 `deployment:persona` scoped section **遮蔽**部署 persona;
-(4) 有 `toolFilter` 则 `childCtx.tools.restrict(...)`。
+(3) 有 `persona` 则注册同名 `deployment:persona` scoped section **遮蔽**部署 persona(`:171-172`);
+(4) 有 `toolFilter` 则 `childCtx.tools.restrict(...)`(`:174`)。
 
 **请求级覆盖点**(`SubagentStartRequest`,`subagent/src/types.ts:100-149`),每项都有
 capability 门(`SubagentRuntime.assertCapabilities`,index.ts:481-496):
@@ -105,13 +112,13 @@ capability 门(`SubagentRuntime.assertCapabilities`,index.ts:481-496):
 ### Q3: `agent.ctx` 作用域能否按 agent 切服务/prompt-section 薄片?
 
 **能,这是结构能力而非巧合。**
-- `SystemPrompt` 用 `ScopedLayers`(`core/system-prompt/src/index.ts:347-350`);
-  `section()/context()` 经 agent 的 `childCtx` 注册即按名遮蔽全局同名片(:373-389 注释
-  明示"A scoped section shadows a global section with the same name");重名错误消息直接
+- `SystemPrompt` 用 `ScopedLayers`(`core/system-prompt/src/index.ts:347`);
+  `section()/context()` 经 agent 的 `childCtx` 注册即按名遮蔽全局同名片(:375 注释
+  明示"A scoped section shadows a global section with the same name",签名在 :381);重名错误消息直接
   指路 `agent.ctx`(:317)。**遮蔽为空文本 ≈ 删除**:`renderPrompt` 丢弃空 section
-  (:212-217)。`suppressRuntimeContext()` 同样 effect 作用域(:415-420)。
+  (:212-217)。`suppressRuntimeContext()` 同样 effect 作用域(:415)。
 - `tools.restrict()` **强制要求 scoped context**,全局调用直接抛错
-  (`core/tools/src/index.ts:1071-1074`)——`agent.ctx` 切片是一等公民。
+  (`core/tools/src/index.ts:1074`)——`agent.ctx` 切片是一等公民。
 - preset 加入是 scope 重挂:`composeFrom(childCtx, parentCtx)`
   (`preset/agent-presets/src/index.ts:316-325`);自定义 provider 亦可给子代理
   `mount()` 另一个 preset,即"子代理跑在与父不同的组曲上"。

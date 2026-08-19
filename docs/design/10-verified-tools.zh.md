@@ -1,6 +1,7 @@
 # 10 verified-tools — 幂等、先验后重试与参数准入
 
 > 状态: design (not started) | Tier: 3 | 包: packages/verification/verified-tools | 依赖: 01
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -36,7 +37,7 @@
 1. **超时已以结构化 error 结果返回**:超时由插件
    `packages/guard/timeout-policy` 承担,产出普通 `ToolExecutionFailure`
    (`isError:true`,`error.info = { name:'ToolTimeoutError', code:'TOOL_TIMEOUT' }`,
-   `packages/guard/timeout-policy/src/index.ts:25,41-48`),wrapper 可按
+   `packages/guard/timeout-policy/src/index.ts:25,46`),wrapper 可按
    `error?.info.code === 'TOOL_TIMEOUT'` 路由。core 仅校验 `timeoutMs` 选项
    (`packages/core/tools/src/schema.ts:499-500`)。
 2. **重复调用已有 advisory 提醒**:`packages/guard/repeat-tool-reminder` 检测连续
@@ -63,10 +64,10 @@ pre-execute 参数校验与 corrective feedback;(d) 上述事件无一致遥测�
    约束:wrapper 只允许替换 `exec.signal`,调用身份不可变
    (`index.ts:155-158,386-394`)。注册形态:`apply(ctx: Context)` 内
    `ctx.on('tools/execute', async (exec, next) => ...)`(参照
-   `packages/guard/timeout-policy/src/index.ts:50-58`)。
+   `packages/guard/timeout-policy/src/index.ts:55`(`apply`)。
 2. **pre-execute 否决**:`'tools/pre-execute'(exec, next)`(`index.ts:152`),决策
    `{kind:'allow'} | {kind:'deny'; reason} | {kind:'ask'; reason}`(`index.ts:588-603`);
-   `deny` 物化为 `Error: <reason>` 的 isError 结果交给模型(`index.ts:1493-1500`)——
+   `deny` 物化为 `Error: <reason>` 的 isError 结果交给模型(`index.ts:1492-1497`)——
    即 corrective feedback 的恢复通道。**pre-execute 不能改写参数**(`index.ts:585-587`),
    因此恢复只能靠 deny-reason 提示模型修正后重发(与 Structured Output Control 的
    runtime 侧 corrective-retry 语义一致)。工具定义用
@@ -80,9 +81,9 @@ pre-execute 参数校验与 corrective feedback;(d) 上述事件无一致遥测�
    `repeat-tool-reminder/src/index.ts:190` 直接调 `ctx.tools.execute()`。
 4. **ASK 升级**:`ctx.approval.request({agent, toolName, callId?, reason?, signal?})`
    → `'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'`
-   (`packages/interaction/user-approval/src/index.ts:153-170,257`;
-   `types.ts:28`)。`'unavailable'` fail-closed;`request()` 必须在 open turn 内
-   (`index.ts:264-272`),wrapper 内天然满足。不绕开 `approval/request` waterfall
+   (`packages/interaction/user-approval/src/index.ts:153-165, :257`;
+   `types.ts:29`)。`'unavailable'` fail-closed;`request()` 必须在 open turn 内
+   (`request()` 在 `:257`,open-turn 检查在 `:259-265`),wrapper 内天然满足。不绕开 `approval/request` waterfall
    (共享原则 1)。
 5. **遥测**:`'session-telemetry/record'` 是同步 redaction transform 而非「发事件」
    API(`packages/session/session-telemetry/src/index.ts:47`,记录形状
@@ -183,7 +184,7 @@ verifiedTools: {
      `off` 原样返回超时错误;`audit` 记 warn 后原样返回;`enforce` →
      `ctx.approval.request({agent, reason, ...})`,`'allowed-once'` = 放行一次重试,
      `'rejected'/'cancelled'` = 返回原超时错误,`'unavailable'` fail-closed
-     (上游语义,`user-approval/types.ts:28`)。
+     (上游语义,`user-approval/types.ts:29`)。
 4. probe 全程计 `probe-run` 遥测(次数、verdict 分布、耗时)。
 
 **流 3 — 参数校验**(`tools/pre-execute`):
@@ -283,14 +284,18 @@ schema 与 doc 12 eval 导出对齐;README(graduation criteria)、示例配置�
    完整 `pre-execute → execute` waterfalls(`invariant.ts:100-110` 的阶段顺序),
    是否会触发权限审批 / 被本 wrapper 递归包裹、Code Mode 的 parent 限制
    (`index.ts:329-334`)在 probe 路径上的具体表现 —— M2 开工前用 spike 验证:
-   「wrapper 内嵌套派发一个 readonly 工具,观测审批与拦截行为」。
-4. **deny reason 是纯文本**(`Error: <reason>`,`index.ts:1493-1500`),无结构化
+   「wrapper 内嵌套派发一个 readonly 工具,观测审批与拦截行为」。rc.7 已核:
+   Code Mode 下,含 image block 的非错误 subtool 结果会额外经 `exec.deferContext(...)`
+   以插件归因的 user message 投递(source plugin `tools-code-mode`,
+   `packages/core/tools/src/code-mode.ts:564-569`)——wrapper/probe 观察
+   `result.content` 时,若存在 image block,不得假定它等于最终模型可见面。
+4. **deny reason 是纯文本**(`Error: <reason>`,`index.ts:1492-1497`),无结构化
    字段;校验违规清单长度可能撑爆展示。检查项:该 `Error:` 前缀文本有无长度
    截断;必要时 reason 只放前 N 条 + 「共 M 处」。
 5. **失败记录的去重抑制可能误挡正当重试**:同参数失败被记 `completed` 后,窗口内
    修复条件满足(如网络恢复)的真实重试会被短路。缓解:失败记录的 TTL 用更短
    子窗口(`windowMs / 4`),或 audit 档对失败记录只观察不短路 —— M1 实验定案。
-6. **approval 可用性**:`request()` 需在 open turn(`user-approval/src/index.ts:264-272`),
+6. **approval 可用性**:`request()` 需在 open turn(`user-approval/src/index.ts:257,259-265`),
    无 UI answerer 的环境(subagent/background)返回 `'unavailable'` → fail-closed。
    这是预期行为,但 `askThreshold` 与 background profile 的组合策略需要文档化,
    避免 background 模式下 unknown 一律失败的体验塌方。

@@ -1,6 +1,7 @@
 # 05 long-run-protocol — Long-Running Session Protocol
 
 > Status: design (not started) | Tier: 1 | Package: packages/session/long-run-protocol | Dependencies: none (optional integration with 04)
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -87,11 +88,12 @@ other (see "Boundary of reset vs compaction").
 2. **Visible-context source**: the agent projects from the log when issuing
    a request — `this.session.deriveMessages()`
    (`packages/core/agent-loop/src/agent.ts:341`); per-node surface
-   projection rules live at `packages/core/session/src/surface.ts:74-76`.
+   projection rule `deriveEventMessage` lives at
+   `packages/core/session/src/surface.ts:83`.
    → After fork, the child session's initial visible context = the event
    projection of the seed prefix; **seed events do not trigger the
    `session/event` firehose** (constructing the seed does not publish,
-   `index.ts:451-455` firstLiveSeq comment). Therefore the handoff text
+   `index.ts:450-472` firstLiveSeq comment). Therefore the handoff text
    cannot rely on "write it into the child session log and have it be
    seen" (surface appends on a non-driven session are unverified, see risk
    R1); it must go through the resume-time injection seam (item 6).
@@ -105,7 +107,7 @@ other (see "Boundary of reset vs compaction").
    `agent?` via declaration merging
    (`packages/core/agent/src/runtime-types.ts:16-20`), and the call site
    always passes `{agent, scope: agent}`
-   (`packages/core/agent/src/dispatch.ts:174-176`, call site
+   (`packages/core/agent/src/dispatch.ts:175`, call site
    `agent-loop/src/agent.ts:230`) → **register one global provider that
    decides, by `context.agent?.session.id`, whether this session is in
    long-run mode**, with no scoped-vs-global contention. Take the
@@ -123,13 +125,17 @@ other (see "Boundary of reset vs compaction").
    payload `{ agent, turn, signal }`
    (`packages/core/agent/src/runtime-types.ts:261-278`); **fires only at
    natural wrap-up** — the turn has already produced `turnEnds` and the
-   steering inbox is empty (`packages/core/agent-loop/src/agent.ts:295`);
-   a listener throwing → the turn ends with error.conclusion(`:302-315`),
+   steering inbox is empty (`packages/core/agent-loop/src/agent.ts:295-296`);
+   a listener throwing → the turn ends with error.conclusion(`:304-315`),
    **so the listener must never throw** (doc 00 tenet 2; wrap everything
    in try/catch). A steer continues **the same open turn** (after the steer
    the inbox is non-empty, so the loop goes through `next-step` instead of
    closing the turn, `:299-300`) → the "per-round cap" is counted keyed by
-   `turn`.
+   `turn`. Test-pinning note: upstream PR #2535 added a web e2e test asserting
+   the full `turn/end` reason equals `{kind:'completed'}` (test-only
+   tightening; no runtime event, payload, or firing-condition change) — the
+   reason shape is now test-pinned upstream; rely only on the documented
+   shape.
 6. **steer/inject attribution seam**: `agent.steer(message: UserMessage): void`
    (`runtime-types.ts:127-133`) injects steering for the next step;
    `agent.inject(...)` queues model-facing context for the next pre-step
@@ -170,9 +176,9 @@ other (see "Boundary of reset vs compaction").
     `token-meter/src/types.ts:22-36`). Model-capacity resolution follows
     the compaction-basic precedent: read the routed {provider, model} from
     `session.requestHeader()?.config`
-    (`packages/compaction/compaction-basic/src/index.ts:52-60`), then
+    (`packages/compaction/compaction-basic/src/index.ts:55`), then
     `ctx.llm.resolveModelInfo(provider, model).context.contextWindow`(same
-    file `:294-303`). fill% = totalTokens / contextWindow.
+    file `:293`). fill% = totalTokens / contextWindow.
 11. **shell seam (optional)**: `ctx.shell: ShellExecutor`
     (`packages/shell/shell/src/index.ts:41-43`), `resolve(request): ShellExecSpec`
     - `run(spec)`(`:85, :93`) — the workspace-dirty check and the init.sh
@@ -460,7 +466,7 @@ fork = M3's acceptance criterion.
   `ctx.get('tokenMeter')` service key (spike: verify the declare-module key
   name in `llm/token-meter/src/index.ts`), and the availability of
   `ctx.llm.resolveModelInfo` plus the `contextWindow` field (following the
-  compaction-basic `:294-303` precedent). If either is missing → record one
+  compaction-basic `:293` precedent). If either is missing → record one
   skip telemetry and never mention it again for that session. **How to
   check**: print the existence of both once in the target profile.
 - **R4 the workspace-dirty check depends on `ctx.shell` and git being

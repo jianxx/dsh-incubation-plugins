@@ -1,6 +1,8 @@
 # 03 trace-contracts — Trace contracts: online gate + offline scoring
 
 > Status: design (not started) | Tier: 1 | Package: packages/verification/trace-contracts | Depends on: none (optional integration with 01)
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -95,7 +97,7 @@ All items below are confirmed by direct code reading (upstream repo
    — type declaration `packages/core/session/src/index.ts:76`
    (`post-commit, fire-and-forget`; listener failures are logged and
    isolated); real usage `packages/core/session/src/invariant.ts:223`. The
-   event keys (`packages/core/session/src/types.ts:236-291`, SessionEventMap)
+   event keys (`packages/core/session/src/types.ts:252-291`, SessionEventMap)
    include `turn/start`, `turn/end`, `step/start`, `step/end`,
    `tool/call { turn, step, callId, name, arguments: string }`,
    `tool/result {…}` — all inputs for the three rule classes
@@ -111,11 +113,24 @@ All items below are confirmed by direct code reading (upstream repo
    via the ledger channel; the plugin's own metrics (compliance %, etc.)
    travel the ops channel, with `telemetry.op` named `trace-contracts.*`.
 5. **Deny feedback outside of approval**: a deny's `reason` is materialized
-   into an `Error: <reason>` tool result (`:1490-1496`) — this is exactly the
+   into an `Error: <reason>` tool result (`:1492-1497`) — this is exactly the
    recovery channel's carrier: the reason is the feedback text the model sees
    on the next turn.
 
 ### Data model / configuration (contract schema sketch)
+
+> **Configuration (rc.7 onward)**: user-tunable knobs (here: the global mode /
+> ask defaults that the `trace.yml` layers below override) are declared through
+> a settings namespace (`settingsNamespace` + `installSettingsSection`,
+> `packages/settings/settings/src/index.ts:863`). Resolution layers: schema
+> defaults → the cordis composition entry (base) → the `settings.yaml` user
+> document. Values hot-reload via `settings/updated` and are readable at runtime
+> through `ctx.settings.describe()`. Registering a namespace exposes it — #2404
+> removed the apiproxy allowlists, so registration is the only exposure control
+> — which means both the web settings page and `settings.yaml` can edit it. The
+> cordis `apply(ctx, config)` second argument remains the composition-defaults
+> layer; `.dsh/trace.yml` precedence (session > project > user) applies below
+> it.
 
 Contract files: `<repo>/.dsh/trace.yml` (project level) and
 `~/.dsh/trace.yml` (user level); `/trace attach <file>` can bind a contract

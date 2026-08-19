@@ -1,6 +1,8 @@
 # 04 goal-verify-gate — 完成前置验证门
 
 > 状态: design (not started) | Tier: 1 | 包: packages/goals/goal-verify-gate | 依赖: 无(可选集成 03)
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -62,7 +64,7 @@ done-ness。两部 durable 状态机对「完成与否」各说各话是本工�
    `arguments.action==='complete'` 命中,`arguments.goal_id` 直接给出目标。
 2. **服务层无 veto 缝**:`ctx.goals.complete`(`packages/goal/goal/src/index.ts
 :336-346`)直通 transition,GoalService 没有任何 pre-mutation hook;
-   `goal/changed` 是 commit 之后的 emit 通知(`:541-558`,声明见
+   `goal/changed` 是 commit 之后的 emit 通知(`:557`,声明见
    `packages/goal/goal/src/domain.ts:104-116`),listener 失败被兜住但无法否决。
    用 cordis 服务同名重注册包裹 `goals` 不可行(服务键单主,重复注册即抛 —
    同约束见 session-telemetry 服务键注释 `:144-146`)。→ v1 拦截层定在工具缝,
@@ -75,7 +77,7 @@ done-ness。两部 durable 状态机对「完成与否」各说各话是本工�
 4. **steer-back 缝**:`agent/turn-stopping` 串行 hook
    (`packages/core/agent/src/runtime-types.ts:261-278`):“a listener that objects
    steers (`agent.steer(...)`) … fresh steering runs another step, none closes the
-   turn”;`agent.steer(message: UserMessage): void`(`:127-133`)。steer 续的是
+   turn”;`agent.steer(message: UserMessage): void`(`:133`)。steer 续的是
    **同一个 open turn**(turn 尚未关),原 turn 的权威上下文(direct-human 或
    goal-round)保留,模型被 steer 后仍可合法调用 complete。归因形状照 tool-goal
    既有先例:`createUserMessage({ content, source: { kind: 'plugin',
@@ -104,7 +106,7 @@ reason?, signal? }`(`packages/interaction/user-approval/src/index.ts:153-174`),
 7. **会话事件观察缝**(session-event-required gate 的证据面):`session/event`
    observer,`tool/call {turn, step, callId, name, arguments}` /
    `tool/result {turn, step, message, error?, meta?}` / `turn/end {turn, reason}`
-   (`packages/core/session/src/types.ts:243-297`、`:155-177`;doc 02 已核读)。
+   (`packages/core/session/src/types.ts:252-291`、`:155-176`;doc 02 已核读)。
 8. **状态存放落点**:`.dsh/` 项目目录是上游既有约定
    (`packages/skill/skill-filesystem/src/index.ts:246` 的
    `<projectRoot>/.dsh/skills`)。gate 声明是 **goal 生命周期附属物**,
@@ -119,6 +121,15 @@ reason?, signal? }`(`packages/interaction/user-approval/src/index.ts:153-174`),
    `/goal-gate <add|list|remove|reset>`,不改上游语法。
 
 ### 数据模型 / 配置(gate declaration schema, modes, stall policy)
+
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮（此处即全局 gate mode 与
+> stall 策略默认值）通过 settings 命名空间声明（`settingsNamespace` +
+> `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为
+> schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持
+> `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——
+> #2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与
+> `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层；
+> per-goal 的 `GateSpec.mode` 覆盖在其下生效。
 
 ```ts
 type GateMode = "off" | "audit" | "enforce";
@@ -321,16 +332,16 @@ store 文件随 terminal phase 清理;拒绝则计数保留,后续 attempt 继�
 _Verified seams(路径:行号均已在 2026-08-17 核读)_:
 `packages/goal/tool-goal/src/index.ts:41-43 / :307-308 / :313-324`;
 `packages/goal/tool-goal/src/authority.ts:65-74 / :101-108`;
-`packages/goal/goal/src/index.ts:336-346 / :541-558`;
+`packages/goal/goal/src/index.ts:336-346 / :557`;
 `packages/goal/goal/src/types.ts:59-68`;
 `packages/goal/goal/src/fold.ts:87-112`;
 `packages/goal/goal/src/domain.ts:104-116`;
 `packages/goal/goal-round-driver/src/index.ts:48-58 / :174-178`;
 `packages/goal/command-goal/src/index.ts:14 / :33-43`;
 `packages/core/tools/src/index.ts:142-152 / :314-337 / :379-384 / :583-591 / :1690-1726`;
-`packages/core/agent/src/runtime-types.ts:127-143 / :261-278`;
+`packages/core/agent/src/runtime-types.ts:133 / :261-278`;
 `packages/core/session/src/index.ts:112-115 / :436-446`;
-`packages/core/session/src/types.ts:155-177 / :243-297`;
+`packages/core/session/src/types.ts:155-176 / :252-291`;
 `packages/session/session-telemetry/src/index.ts:35-46 / :64-86 / :94-104 / :144-151`;
 `packages/interaction/user-approval/src/index.ts:153-174 / :188-190`;
 `packages/interaction/user-approval/src/types.ts:29`;

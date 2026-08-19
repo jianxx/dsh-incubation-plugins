@@ -4,6 +4,8 @@
 对 `deepseek-harness`(dsh 核心)+ `dsh-cc-plugins`(CC parity 插件集)的缺口分析,经独立评审修订。
 每篇文档对应一个孵化工作项,按实现粒度切分为 PR 级里程碑。编号即构建顺序。
 
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
+
 ## 分析框架(三把尺子)
 
 1. **三层验证栈**(不可互相替代):trace property → action gate → claim contract
@@ -26,17 +28,25 @@ KV 复用/投机解码/WorkflowCompile(serving plane)、TUI、自动更新、多
 
 ## 共享设计原则(所有工作项遵守)
 
-1. **ASK 走 `approval/request` waterfall**,不自造确认通道;不依赖 dsh-cc-plugins
-   (跨仓库只做运行时可选集成,编译期零依赖)。
+1. **ASK 走 `approval/request` waterfall**,不自造确认通道。插件代码绝不从
+   `tools/pre-execute` 监听器里直接调 waterfall:返回 `{kind:'ask', reason}`,
+   由工具注册表内部经 `serviceAsk` 解析(已对照上游核实)。
 2. **turn 终止干预 = steer-back 续轮,不是 veto**:`agent/turn-stopping` 在自然完成时
    串行触发,插件通过注入带插件归因的 user 消息续轮;抛异常会把 STALL 变成 crash,
    listener 必须永不 throw。steer 消息参与 round 记账 — 归因标记必须做好。
-3. **执行强度做可调配置**(SafetySentry 连续谱):每个 gate 类插件都提供
-   `off / audit / enforce` 三档,ASK 阈值可配,不写死策略。
+3. **执行强度是声明的、用户可调的旋钮**(SafetySentry 连续谱):每个 gate 类
+   插件通过 rc.7 settings 命名空间声明自己的 `off / audit / enforce` 三档与
+   ASK 阈值(`settingsNamespace` + `installSettingsSection`,
+   `packages/settings/settings/src/index.ts:863`);解析层次 = schema 默认值 →
+   cordis 组合入口(base)→ `settings.yaml` 用户文档;热更新走
+   `settings/updated`,运行时可经 `ctx.settings.describe()` 读取。注册命名空间
+   即暴露该命名空间(#2404 移除了 apiproxy allowlist——注册是唯一的暴露控制),
+   cordis `apply(ctx, config)` 的第二个参数仍是组合默认值层。各 gate 的
+   `off / audit / enforce` 语义不变;不写死策略。
 4. **tool-manifest 是共享基座**:副作用分类、幂等配方、外泄分类、验证探针等
    per-tool 元数据只允许一种注解机制(doc 01)。
-5. **观测统一走 `session-telemetry/record` waterfall + session/event 流**,
-   事件 schema 在所有插件间一致(见 doc 12 的 eval 导出 schema)。
+5. **观测统一走 `session-telemetry/record` waterfall(运维通道)+ session/event
+   流**。自定义 session 事件类型对下游插件封闭——不得新增 session 事件类型。
 6. **里程碑 = PR 粒度**:每个 M 独立可合入、带验证标准;
    `pnpm new:plugin <group> <name>` 脚手架生成骨架,门禁必须全绿。
 

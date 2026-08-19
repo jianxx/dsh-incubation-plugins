@@ -1,6 +1,8 @@
 # 08 skill-lifecycle — admission, utility, and retirement of skill artifacts
 
 > Status: design (not started) | Tier: 2 | Package: packages/skills/skill-lifecycle | Dependencies: none
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -46,7 +48,7 @@ details):
 | 1 evidence acquisition | offline (hand-written / ported from elsewhere), no runtime requirement | not done |
 | 2 proposal | `ctx.skills.register` exists (runtime skill registration, `packages/skill/skill/src/index.ts:440`), but has no review step | reused as the registration egress for admitted skills |
 | 3 verification/admission | **missing**: a candidate produced by any provider goes straight into the catalog and tools | **core**: admission gate |
-| 4 organization/storage | registry dedups by rank/scope tier (`skill/src/index.ts:568-583`, `BUNDLED_SKILL_RANK=600` `:24` / `RUNTIME_RANK=250` `:27`), but no versioning, no content addressing, no persistence | versioned provenance store |
+| 4 organization/storage | registry dedups by rank/scope tier (`skill/src/index.ts:568-583`, `RUNTIME_RANK=250` `:24` / `BUNDLED_SKILL_RANK=600` `:27`), but no versioning, no content addressing, no persistence | versioned provenance store |
 | 5 retrieval/composition | already present: core `skill` tool + `<available_skills>` catalog (see next section) | reuse; no rerank/composition |
 | 6 maintenance/repair | **missing**: no usage stats, no utility signal, no demote | utility tracking + demote proposals |
 | 7 distillation/portability | none | not done (offline; import lint provides the docking point) |
@@ -116,11 +118,14 @@ landing point for the gate.
 4. **Permissions and tool grants**:
    `PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions'`
    (`packages/interaction/permission-rules/lib/types/types.d.ts:34`,
-   `PERMISSION_MODES` constant `:36`); session state key
-   `'permission/mode': { mode: … }`
-   (`packages/core/session/src/types.ts:343`). Tool-grant channel:
+   `PERMISSION_MODES` constant `:36`); `'permission/mode'` is a session
+   **event** type, not a state key — it is declared by module augmentation of
+   `SessionEventMap` in the vendored
+   `@deepseek-ai/dsh-permission-rules` lib output
+   (`packages/interaction/permission-rules/lib/types/index.d.ts:31-33`,
+   payload `{ mode: PermissionMode }`). Tool-grant channel:
    `ctx.tools.restrict(filter)` with `ToolRestriction { allow?, deny? }`
-   (`packages/core/tools/src/index.ts:675-686,1071`); the translation from
+   (`packages/core/tools/src/index.ts:680-686,1071`); the translation from
    CC-format `allowed-tools` to `ToolRestriction` exists only in the vendored
    `skill-claude-code` lib output
    (`packages/skill/skill-claude-code/lib/types/translate.d.ts:15-22`); there
@@ -162,6 +167,10 @@ interface SkillGovernanceRecord {
 **State machine**: `candidate → active → archived`; `archived → active` is
 allowed only via rollback (pointing at a historical version). Every transition
 appends an audit event (actor: human|auto, trigger, reason).
+
+#### Configuration (rc.7 onward)
+
+> **Configuration (rc.7 onward)**: user-tunable knobs are declared through a settings namespace (`settingsNamespace` + `installSettingsSection`, `packages/settings/settings/src/index.ts:863`). Resolution layers: schema defaults → the cordis composition entry (base) → the `settings.yaml` user document. Values hot-reload via `settings/updated` and are readable at runtime through `ctx.settings.describe()`. Registering a namespace exposes it — #2404 removed the apiproxy allowlists, so registration is the only exposure control — which means both the web settings page and `settings.yaml` can edit it. The cordis `apply(ctx, config)` second argument remains the composition-defaults layer; this package's knobs (`mode`, `lint`, `demote`, …) ride that layer.
 
 **Configuration** (zod; follows the enforcement-strength continuum of shared
 principle 3):
@@ -230,7 +239,7 @@ recorded. Initial rule set:
 | `safety/network-egress` | unexpected network calls in the instructions (curl/wget/fetch URLs, webhook addresses, hard-coded IPs) |
 | `safety/secret-ref` | references to credential paths or env-var exfiltration (`~/.ssh`, `$TOKEN` concatenation echoed back, etc.) |
 | `grant/resolvable` | every name in `allowed-tools` resolvable via `ctx.tools.get`; unresolvable ⇒ block |
-| `grant/mode-compat` | warn when grants are non-empty and the current `'permission/mode' === 'plan'` (read-only window); under `bypassPermissions`, raise egress/secret severity by two notches |
+| `grant/mode-compat` | warn when grants are non-empty and the mode folded via `foldPermissionMode(agent.session.events)` is `'plan'` (read-only window); under `bypassPermissions`, raise egress/secret severity by two notches. Note: the plan-mode overlay is applied by the engine at call time, so a folded value may miss a live plan overlay |
 
 **Rejection memory**: rejected contentHashes are persisted; re-importing the
 same hash is rejected outright, with the first-run lint findings attached (the
@@ -298,10 +307,15 @@ Each M is an independently mergeable PR (scaffolded from
    the constructor and `apply` (`:130`); if it cannot be instantiated
    standalone, fall back to self-scanning directories (thin logic — only
    frontmatter parsing + root enumeration).
-2. **Plugin-side read access to `permission/mode`**: the state key is
-   confirmed (`core/session/src/types.ts:343`), but the concrete
-   subscribe/read API is unverified. Check: how other plugins read session
-   state (find consumers of `permission/mode`; grep the whole repo).
+2. **Plugin-side read access to `permission/mode`** (partially resolved):
+   event-read is resolved — plugins read the mode via
+   `foldPermissionMode(agent.session.events)` (exported by
+   `@deepseek-ai/dsh-permission-rules`,
+   `packages/interaction/permission-rules/lib/types/index.d.ts:103`;
+   last-wins fold), or by subscribing to `session/event` filtered on
+   `event.type === 'permission/mode'`. Remaining caveat: the plan-mode
+   overlay is applied by the engine at call time, so a folded value may
+   miss a live plan overlay.
 3. **Event name for follow-error statistics**: `agent/post-tool` or an
    equivalent tool-result event is unverified. Check: survey the agent event
    table in `packages/core`; confirm the tool-call completion event and its

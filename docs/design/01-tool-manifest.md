@@ -1,6 +1,7 @@
 # 01 tool-manifest — A shared substrate for tool metadata
 
 > Status: design (not started) | Tier: 1 (substrate) | Package: packages/verification/tool-manifest | Depends on: none (only cordis + dsh core types) | Consumers: 02 claim-contracts, 09 token-wall, 10 verified-tools
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -53,7 +54,7 @@ authoritative, overridable, fail-closed per-tool metadata registry**.
 Seams verified one by one (file:line):
 
 - **Service registration pattern** (cordis `Service`):
-  `dsh-cc-plugins/packages/interaction/permission-rules/src/index.ts:153`
+  `dsh-cc-plugins/packages/interaction/permission-rules/src/index.ts:154`
   (`class PermissionRulesService extends Service`, with `super(ctx, 'permissionRules')`
   in the constructor, `static inject = ['tools']`, and type declaration merging via
   `declare module '@deepseek-ai/cordis' { interface
@@ -64,17 +65,17 @@ Context { permissionRules: ... } }`). tool-manifest follows this pattern to moun
   `deepseek-harness/packages/core/tools/src/index.ts`,
   `ToolRuntime extends Service` (:787, `super(ctx, 'tools')`); public surface:
   `get(name, scope?): ToolDefinition | undefined` (:1204),
-  `schemas(scope?): ToolSchema[]` (:1234), `guard()` (:1110), and the
+  `schemas(scope?): ToolSchema[]` (:1234), `guard()` (:1114), and the
   `tools/change` event (:207, register/unregister notification, for incremental
   refresh by the coverage lint).
   `ToolSchema = { name: string; description: string; parameters: Record<string, unknown> }`
-  (`deepseek-harness/packages/llm/llm/src/types.ts:312`).
+  (`deepseek-harness/packages/llm/llm/src/types.ts:333`).
 - **glob matching semantics** (aligned with permission-rule):
   `permission-rules/src/parser.ts:27` `matchContent` — `*` is a wildcard, `:*` is a
   prefix; the manifest's `pattern` field reuses the same semantics to avoid a second
   matching dialect.
 - Execution flow: the listener shape for `tools/pre-execute` can be seen at
-  permission-rules/src/index.ts:216.
+  permission-rules/src/index.ts:217.
 
 The **read direction** of tool enumeration: tool-manifest listens to `tools/change`
 
@@ -161,21 +162,48 @@ Shipped with the package in M2 (JSON), with per-tool grading rationale:
 
 | Tool                                    | effectClass           | disclosureClass  | failureSemantics    | Idempotency / rationale                                                                                                                                                         |
 | --------------------------------------- | --------------------- | ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read`,`list`,`glob`,`grep` (fs-search) | `readonly`            | `none`           | `atomic`            | read-only; idempotency key = path/pattern args, pure content addressing                                                                                                         |
-| `write`,`str_replace_editor`            | `write-local`         | `none`           | `atomic`            | modifies local files; failure means no write; idempotency key = file_path + content hash                                                                                        |
+| `read`,`read_image`,`glob`,`grep` (fs-search) | `readonly`            | `none`           | `atomic`            | read-only; idempotency key = path/pattern args, pure content addressing                                                                                                    |
+| `write`,`edit`,`str_replace_editor`     | `write-local`         | `none`           | `atomic`            | modifies local files; failure means no write; idempotency key = file_path + content hash                                                                                        |
 | `bash`,`pwsh`                           | `side-effecting`      | `egress-payload` | `timeout-ambiguous` | commands can touch the network and mutate the system; timeout does not mean not executed; no retry — retryProbe is supplied by the caller                                       |
+| `run_code`                              | `side-effecting`      | `none`           | `timeout-ambiguous` | executes a model-written program in the code runtime; timeout does not mean not executed; binding traffic stays execution-local                                                |
 | `skill`                                 | `readonly`            | `none`           | `atomic`            | only loads instruction text into context, no writes of its own; any follow-up actions are the responsibility of the subsequent tools                                            |
-| `todo`                                  | `write-local`         | `none`           | `atomic`            | in-session state; idempotency key = the full entry set                                                                                                                          |
-| `goal`                                  | `authority-change`    | `none`           | `atomic`            | changes the agent's goal stack — an authority/intent-surface change that gate-type plugins must question separately                                                             |
-| `subagent`,`fork`                       | `side-effecting`      | `none`           | `timeout-ambiguous` | spawned subagents call tools on their own; whether the child has started is unknowable at the timeout point                                                                     |
+| `todo_write`                            | `write-local`         | `none`           | `atomic`            | in-session state; idempotency key = the full entry set                                                                                                                          |
+| `get_goal`                              | `readonly`            | `none`           | `atomic`            | pure query of the current goal and revision                                                                                                                                     |
+| `create_goal`                           | `write-local`         | `none`           | `atomic`            | creates the session goal record (requires a direct human request); idempotency key = objective text                                                                             |
+| `update_goal`                           | `authority-change`    | `none`           | `atomic`            | edit/pause/resume/complete/blocked change the continuation policy of the session — an authority/intent-surface change that gate-type plugins must question separately            |
+| `subagent`                              | `side-effecting`      | `none`           | `timeout-ambiguous` | spawned subagents call tools on their own; whether the child has started is unknowable at the timeout point                                                                     |
 | `report` (subagent report-back)         | `write-local`         | `none`           | `atomic`            | writes only to the parent session context                                                                                                                                       |
 | `list_agents`                           | `readonly`            | `none`           | `atomic`            | pure query                                                                                                                                                                      |
-| `jobs`,`workflow`,`ralph`               | `side-effecting`      | `none`           | `timeout-ambiguous` | schedules/orchestrates background execution; after submission the main execution body may already be running                                                                    |
+| `interrupt_agent`,`send_message`        | `side-effecting`      | `none`           | `atomic`            | injects into / interrupts a live child agent — mutates another agent's run, not local files                                                                                     |
+| `job_output`,`job_list`                 | `readonly`            | `none`           | `atomic`            | pure query of background-job state and output                                                                                                                                   |
+| `job_kill`                              | `side-effecting`      | `none`           | `timeout-ambiguous` | terminates a background job; steps already executed are not undone by the kill                                                                                                 |
+| `ralph`,`workflow`                      | `side-effecting`      | `none`           | `timeout-ambiguous` | orchestrates fresh-child / multi-agent background execution; after submission the main execution body may already be running                                                    |
 | `web_search`                            | `external-disclosure` | `egress-payload` | `atomic`            | the query goes out to a search provider — it is itself a disclosure act; resending the same query adds no new disclosure; idempotency key = query + day-granularity time bucket |
+| `web_fetch`                             | `external-disclosure` | `egress-payload` | `atomic`            | registered by default (`packages/web/tool-web/src/index.ts:41,54`, `fetch: true`); the fetched URL itself is the disclosure payload                                              |
+| `lsp`                                   | `readonly`            | `none`           | `atomic`            | pure query over the language-server surface                                                                                                                                     |
+| `terminal_open`,`terminal_close`,`terminal_list`,`terminal_read` | `side-effecting` | `none` | `atomic`     | create/destroy/observe shared terminal sessions — session state is mutated by open/close, so they are not classified readonly                                                   |
+| `terminal_send`,`terminal_signal`       | `side-effecting`      | `none`           | `timeout-ambiguous` | drive command execution inside a terminal session; timeout does not mean not executed (same bash-family rationale)                                                              |
+| `schedule_create`,`schedule_delete`     | `write-local`         | `none`           | `atomic`            | only mutates a durable reminder record; idempotency key = record fields (see footnote)                                                                                          |
+| `schedule_list`                         | `readonly`            | `none`           | `atomic`            | pure query of reminder records                                                                                                                                                  |
+| `session_search`,`session_trace`,`session_event_read`,`session_event_search`,`session_event_trace` | `readonly` | `none` | `atomic` | pure query over persisted session/event history; idempotency key = query args, pure content addressing                                                              |
 
-(web_fetch is disabled upstream and not in the manifest; if enabled later, default
-to `external-disclosure` + `egress-payload`, plus `publish` only when the target is
-a public site.)
+schedule_create/delete only mutate a durable reminder record; the record's
+user-visible effect (a future notification) is a deferred side effect, not a
+dispatch-time one. schedule_* are reminders, not a scheduler.
+
+- `fork` is not a separate tool: `tool-subagent` registers one tool whose name
+  comes from the `toolName` config (`packages/subagent/tool-subagent/src/index.ts:83`,
+  default `subagent`; shipped profiles also surface the same package under the
+  `subagent_fork` alias). Provider selection is a `SubagentProvider` concern, not
+  a tool-manifest row.
+- `plan` is a slash command (`packages/plan/plan-mode/src/index.ts:271`,
+  `commands.register`), not a tool; the tool from that package is
+  `exit_plan_mode`, which presents the completed plan for direct-human review —
+  an authority/intent-surface change (`authority-change`) when it appears in a
+  profile.
+- Dynamic MCP tools keep falling into the fail-closed default entry (unknown →
+  `side-effecting` / `timeout-ambiguous`); MCP-server authors may ship
+  plugin-declared entries to opt specific tools out of it.
 
 ## Milestone breakdown
 
@@ -222,9 +250,11 @@ a public site.)
   by line — whether the coverage lint needs to iterate all agent scopes will be
   checked at M2 implementation time with `grep -n "ScopeKey"
 packages/core/tools/src/index.ts`, then backfilled with tests.
-- **user-overlay file watching**: whether dsh has an existing config-file watch
-  facility (like settings' installSettingsSection) is unverified; M1 reads once,
-  and hot update is demoted to an open question.
+- **user-overlay file watching**: verified — the settings plane already ships the
+  facility (`installSettingsSection` plus the `settings/updated` commit event,
+  `packages/settings/settings/src/index.ts:863,:778`); the remaining open question
+  is whether the overlay should be a settings namespace (inheriting that hot
+  reload) rather than a separately watched file.
 - **Source of the agentId in idempotency keys**: a stable per-agent identifier is
   needed in the hash; which field of `ToolExecution.agent` to take will be verified
   against its execution context when doc 10 is kicked off.

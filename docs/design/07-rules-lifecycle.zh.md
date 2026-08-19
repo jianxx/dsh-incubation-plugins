@@ -1,6 +1,8 @@
 # 07 rules-lifecycle — 行为规则工件的捕获、生效与收敛
 
 > 状态: design (not started) | Tier: 2 | 包: packages/memory/rules-lifecycle | 依赖: 无
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -85,6 +87,15 @@ memory 文件;若未来做集成,只允许在 consolidation prompt 中只读引�
    声明类型(session-title-llm 即此范式)。
 
 ### 数据模型 / 配置(rule entry schema, budgets, thresholds)
+
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮（即下表的注入预算、overflow
+> mode、阈值等）通过 settings 命名空间声明（`settingsNamespace` +
+> `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为
+> schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持
+> `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——
+> #2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与
+> `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层；
+> 下文的 `.dsh/rules/*.md` 是规则内容而非配置。
 
 **存储**:`.dsh/rules/{behavioral,code-standards,self-review,anti-patterns,workflow}.md`,
 五段一一对应 SSCA 五段。写入走插件内部原子写(temp + rename),不经 tool 表面;

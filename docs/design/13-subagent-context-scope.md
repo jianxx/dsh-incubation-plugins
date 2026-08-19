@@ -1,6 +1,7 @@
 # 13 subagent-context-scope — Need-Only Context Boundaries for Subagents (Spike-First)
 
 > Status: spike: done (verdict: **feasible-plugin**, evidence below) | Tier: 3 | Package: packages/agents/subagent-context-scope (M0 verdict: feasible) | Dependencies: none (upstream `deepseek-harness` provides every seam; doc 01/12 are runtime-optional integrations only)
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -42,6 +43,14 @@ real limitation: `ctx.sessions.fork` is a session-level pure-slicing seam (unrel
 subagent seeds), and the creation window of one-shot subagents has no plugin hook (this can
 be bypassed in M1 by assembling your own driver from public APIs, see Q2).
 
+rc.7 note on the shipped external providers: `subagent-claude-code` and
+`subagent-codex` gained `run_in_background` in rc.7 (Job-registry-backed:
+`backgroundMode: 'one-shot'`; explicit `true` returns a parent-owned Job id
+consumable via `job_output`/`job_kill`), and both are explicitly OPT-IN mounts —
+production dsh does not install them (the `disabled: true` tool rows plus the
+"Production dsh does not install these optional providers" comment in
+`apps/cli/config/agent-presets/standard/agent.cordis.yml`).
+
 ### Q1: What context does a subagent get at spawn? Where are the override points?
 
 **fork path (in-process fork)**:
@@ -61,12 +70,12 @@ subagent starts brand-new (its own session, its own system prompt, zero parent c
 `startInProcessRun(request, {seed})`: resolve depth → capture delegated policy (approval pinned
 to `'never'`) → `parent.ctx.agents.create({sessionId, meta, seed, agentOptions, signal, setup})`,
 where `setup(childCtx)` (:120-130) calls `applyChildComposition`:
-`packages/subagent/subagent/src/child-agent.ts:163-175` —
+`packages/subagent/subagent/src/child-agent.ts:163-174` —
 (1) `agentPresets.composeFrom(childCtx, parent.ctx)` joins the parent preset;
 (2) registers the `subagent:delegation` runtime context (order 120);
 (3) if `persona` is present, registers a same-named `deployment:persona` scoped section that
-**shadows** the deployment persona;
-(4) if `toolFilter` is present, calls `childCtx.tools.restrict(...)`.
+**shadows** the deployment persona (`:171-172`);
+(4) if `toolFilter` is present, calls `childCtx.tools.restrict(...)` (`:174`).
 
 **Request-level override points** (`SubagentStartRequest`, `subagent/src/types.ts:100-149`),
 each gated by a capability (`SubagentRuntime.assertCapabilities`, index.ts:481-496):
@@ -130,14 +139,14 @@ JSON values).
 ### Q3: Can `agent.ctx` scope carve per-agent slices of services / prompt sections?
 
 **Yes — this is a structural capability, not a coincidence.**
-- `SystemPrompt` is built on `ScopedLayers` (`core/system-prompt/src/index.ts:347-350`);
+- `SystemPrompt` is built on `ScopedLayers` (`core/system-prompt/src/index.ts:347`);
   `section()/context()` registered through an agent's `childCtx` shadows the global
-  same-named section (the comment at :373-389 states "A scoped section shadows a global
-  section with the same name"); the duplicate-name error message points straight at
+  same-named section (:375 states "A scoped section shadows a global
+  section with the same name", signature at :381); the duplicate-name error message points straight at
   `agent.ctx` (:317). **Shadowing with empty text ≈ deletion**: `renderPrompt` drops empty
-  sections (:212-217). `suppressRuntimeContext()` is likewise effect-scoped (:415-420).
+  sections (:212-217). `suppressRuntimeContext()` is likewise effect-scoped (:415).
 - `tools.restrict()` **requires a scoped context** — calling it globally throws outright
-  (`core/tools/src/index.ts:1071-1074`): `agent.ctx` slicing is a first-class citizen.
+  (`core/tools/src/index.ts:1074`): `agent.ctx` slicing is a first-class citizen.
 - Joining a preset is a scope re-mount: `composeFrom(childCtx, parentCtx)`
   (`preset/agent-presets/src/index.ts:316-325`); a custom provider can also `mount()` a
   different preset for the subagent — i.e., "the subagent runs on a different orchestration

@@ -1,6 +1,8 @@
 # 02 claim-contracts — 声明与输出契约准入层
 
 > 状态: design (not started) | Tier: 1 | 包: packages/verification/claim-contracts | 依赖: 01 tool-manifest
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -59,7 +61,7 @@ session event 流携带 `assistant/message`、`tool/result` 等全量事件并�
    `packages/core/tools/src/index.ts:175`:
    `(exec: ToolExecution, result: Readonly<ToolExecutionResult>, next: () => Promise<PostToolDecision>) => Promise<PostToolDecision>`。
    插件以 `ctx.on('tools/post-execute', handler)` 注册。
-2. **判定类型 — `PostToolDecision`** 同文件 `:596-600`:
+2. **判定类型 — `PostToolDecision`** 同文件 `:597-601`:
    `{kind:'accept'; content?|value?; additionalContexts?}` 两条变体 +
    `{kind:'block'; feedback: ContentBlock[]; additionalContexts?}`。
    消费点 `postExecute()`(:1742-1781,已核实):`block` 把结果替换为
@@ -71,18 +73,22 @@ session event 流携带 `assistant/message`、`tool/result` 等全量事件并�
    corrective feedback」)。注意:listener 抛异常会被兜成 isError(:1740 注释)—
    我们的 handler **必须永不 throw**,否则丢失 actionable feedback;且 block 会丢弃
    工具 defer 的 context,只保留 block 决定自带的 `additionalContexts`。
-3. **结果形态 — `ToolExecutionResult`** 同文件 `:556-580`:成功载
-   `value: JsonValue + content: ContentBlock[]`,失败载 `error: ToolFailure`;
-   validator 优先读结构化 `value`,`meta` 可作领域辅助。
+3. **结果形态 — `ToolExecutionResult`** 同文件:成功 `ToolExecutionSuccess` 在
+   `:556`,载 `value: JsonValue + content: ContentBlock[]`;union 在 `:580`;失败载
+   `error: ToolFailure`(类型 `ToolFailure` `:481`)。validator 优先读结构化 `value`,
+   `meta` 可作领域辅助。
 4. **声明审计缝 — `session/event` observer**
    `packages/core/session/src/index.ts:76`:
    `(session: Session, event: SessionEvent) => void`(纯 observer,无返回值)。
-   事件载荷 `packages/core/session/src/types.ts:243-297`:`assistant/message`
-   `{turn, step, message, usage?}`、`tool/call` `{turn, step, callId, name, arguments}`、
+   事件载荷 `packages/core/session/src/types.ts:252-291`(载荷键 `:273-291`):
+   `assistant/message` `{turn, step, message, usage?}`、`tool/call` `{turn, step, callId, name, arguments}`、
    `tool/result` `{turn, step, message, error?, meta?}`、`turn/end {turn, reason}`
-   (`TurnEndReason` 枚举 `:155-177`:completed/aborted/blocked/error/max-tokens/
-   interrupted)。事件信封 `:415-447` 带 `seq`(会话内单调)、`time`、
-   `sourceEventSeqs`- 证据引用直接用 seq 表达。消费范式见
+   (`TurnEndReason` 枚举 `:155-176`:completed/aborted/blocked/error/max-tokens/
+   interrupted)。事件信封带 `seq`(会话内单调,`:407-408`)、`time`、
+   `sourceEventSeqs`(`:432`)— 证据引用直接用 seq 表达。注意:completed 情形下
+   完整的 `turn/end` reason 对象 `{kind:'completed'}` 已被上游 web e2e 测试钉死
+   (PR #2535;仅测试收紧)— reason 形状已被测试锁定,声明核查不得依赖额外的
+   reason 字段。消费范式见
    `packages/core/agent-loop/src/runtime-context.ts:46`。
 5. **遥测缝 — `session-telemetry/record` waterfall**
    `packages/session/session-telemetry/src/index.ts:43`,
@@ -97,6 +103,15 @@ session event 流携带 `assistant/message`、`tool/result` 等全量事件并�
    source `project-dsh`)。
 
 ### 数据模型 / 配置(contract + validator schema, modes)
+
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮（此处即下文的全局 off/audit/enforce
+> mode 默认值）通过 settings 命名空间声明（`settingsNamespace` + `installSettingsSection`，
+> `packages/settings/settings/src/index.ts:863`）：解析分层为 schema 默认值 → cordis
+> 组合条目（base）→ `settings.yaml` 用户文档；支持 `settings/updated` 热更新与
+> `ctx.settings.describe()` 运行时读取。注册即暴露——#2404 移除了 apiproxy 白名单，
+> 注册是唯一的暴露控制点——因此 web 设置页与 `settings.yaml` 都可编辑；cordis
+> `apply(ctx, config)` 第二参数保留为组合默认值层；`.dsh/contracts/*.yml` 仍为其下的
+> 项目级配置层。
 
 契约文件(YAML,每文件一条,`.dsh/contracts/*.yml`;内置契约随包携带同名格式):
 
@@ -250,9 +265,9 @@ turn 以 aborted/error 结束则整轮跳过(声明不成立的环境,不做判�
 ---
 
 *Verified seams(路径:行号均已在 2026-08 核读)*:`packages/core/tools/src/index.ts`
-:175 / :556-600 / :1742-1781;`packages/core/tools/tests/tools.spec.ts:856-872`;
+:175 / :481 / :556-580 / :597-601 / :1742-1781;`packages/core/tools/tests/tools.spec.ts:856-872`;
 `packages/core/session/src/index.ts:76`;`packages/core/session/src/types.ts`
-:155-177 / :243-297 / :415-447;`packages/session/session-telemetry/src/index.ts`
+:155-176 / :252-291 / :407-408 / :432;`packages/session/session-telemetry/src/index.ts`
 :43 / :64- / :104;`packages/core/agent-loop/src/agent.ts:296`;
 `packages/core/agent-loop/src/runtime-context.ts:46`;
 `packages/skill/skill-filesystem/src/index.ts:246`。

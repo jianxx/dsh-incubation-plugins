@@ -1,6 +1,8 @@
 # 06 issue-pilot — issue-level task control plane
 
 > Status: design (not started) | Tier: 1 | Package: packages/control-plane/issue-pilot | Depends on: 01, 04, 05
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -74,6 +76,18 @@ Design decisions and implications:
    `ctx.shell` (see risk R2).
 
 ### Data model / configuration
+
+> **Configuration (rc.7 onward)**: user-tunable knobs (here: the scan
+> interval / concurrency / label-scheme defaults) are declared through a
+> settings namespace (`settingsNamespace` + `installSettingsSection`,
+> `packages/settings/settings/src/index.ts:863`). Resolution layers: schema
+> defaults → the cordis composition entry (base) → the `settings.yaml` user
+> document. Values hot-reload via `settings/updated` and are readable at runtime
+> through `ctx.settings.describe()`. Registering a namespace exposes it — #2404
+> removed the apiproxy allowlists, so registration is the only exposure control
+> — which means both the web settings page and `settings.yaml` can edit it. The
+> cordis `apply(ctx, config)` second argument remains the composition-defaults
+> layer; the on-disk issue state files below are state, not configuration.
 
 **Issue state file** `.dsh/issue-pilot/<owner>/<repo>/<issue>.json` (atomic write: tmp+rename):
 
@@ -229,6 +243,11 @@ Documentation (README + graduation criteria section).
 
 ## Risks and open questions
 
+- R0 **Status line (re-confirmed against rc.7)**: upstream still ships NO
+  durable scheduler/cron; `ctx.jobs`'s JobRegistry remains an in-process
+  contract (`packages/jobs/jobs/README.md:40`, "The contract is in-process"),
+  so this doc's own on-disk state machine + restart-reconciler design premise
+  holds unchanged.
 - R1 **`ctx.jobs` in-process contract**: restarts lose live jobs; the reconciler can only `resume` if session persistence is present; in a composition without persistence, an interrupted `running` can only be re-spawned — before M2, confirm the target deployment composition
   mounts `session-persistence-*` (check: the composition profile's plugins list).
 - R2 **Permission surface of unattended sessions**: pilot creates top-level sessions, which do not go through subagent delegated-policy

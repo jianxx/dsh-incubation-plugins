@@ -1,6 +1,8 @@
 # 09 token-wall — Pre-transmission semantic auditing of cross-boundary token flows
 
 > Status: design (not started) | Tier: 2 | Package: packages/security/token-wall | Depends on: 01
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -51,8 +53,8 @@ Gaps:
   (`user-approval/src/types.ts:29`).
 - **`ctx.llm`** — `packages/llm/llm/src/index.ts:47-48`; the runtime exposes only
   `stream(options: GenerateOptions)`(:913); `GenerateOptions`
-  (`packages/llm/llm/src/types.ts:320-356`) requires explicit `provider` + `model`;
-  auxiliary-call classification has only `purpose: 'compaction'|'session-title'`(:355) —
+  (`packages/llm/llm/src/types.ts:341-377`) requires explicit `provider` + `model`;
+  auxiliary-call classification has only `purpose: 'compaction'|'session-title'`(:376) —
   **no cheapest/small selection primitive**; the auditor's `{provider, model}` comes from plugin config.
 - **`session-telemetry/record`** — `packages/session/session-telemetry/src/index.ts:43`;
   `SessionTelemetryRecord{channel:'ledger'|'ops', time, severity, attributes, body}`(:64).
@@ -71,6 +73,10 @@ Four sink classes (extensible via declarative config):
 | `publish-file-write` | `write`/`edit` tool whose `file_path` hits a `publishPaths` glob (e.g. `docs/**`, `README*`, registry/plugin manifests); hits on `localScratchPaths` (e.g. `.dsh/scratch/**`, `**/*.tmp`) are **not sinks** | complete `content` / edit patch (visible only at pre-execute) | precheck; gray case → ASK under enforce |
 | `authority-change` | manifest `effectClass = authority-change`, or path hits credential/settings patterns (`.dsh/**/settings.json`, `**/.credentials*`, plugin package-root `package.json`, permission-pattern-changing tools) | complete args / content | **always ≥ ASK** (auditing additionally layered on under enforce; under audit mode record-only, never blocks) |
 | `memory-rule-write` | the tool's write target belongs to the rules-lifecycle store namespace (identified via tool-argument paths, e.g. `.dsh/rules/**`) | complete content | precheck + gray-case auditor |
+
+**Verified capability note (rc.7)**: code mode defers image-bearing subtool results — at `packages/core/tools/src/code-mode.ts:564-569` a non-error result whose content contains image blocks is additionally pushed via `exec.deferContext(...)` as a plugin-attributed user message (source plugin `tools-code-mode`), and PR #2252 bridges durable image content across MCP/ACP (`packages/acp/acp/src/content.ts`). Consequence for this design: payload-digest prechecks over `exec.arguments` see image REFS, not raw bytes; a "tool-result image egress" sink class is stated as future work.
+
+**Configuration (rc.7 onward)**: user-tunable knobs are declared through a settings namespace (`settingsNamespace` + `installSettingsSection`, `packages/settings/settings/src/index.ts:863`). Resolution layers: schema defaults → the cordis composition entry (base) → the `settings.yaml` user document. Values hot-reload via `settings/updated` and are readable at runtime through `ctx.settings.describe()`. Registering a namespace exposes it — #2404 removed the apiproxy allowlists, so registration is the only exposure control — which means both the web settings page and `settings.yaml` can edit it. The cordis `apply(ctx, config)` second argument remains the composition-defaults layer; this package's knobs (`mode`, `perSink`, `grayBand`, `auditor`, …) ride that layer.
 
 **Configuration** (plugin config, fully tunable, honoring shared principle 3):
 
@@ -135,6 +141,8 @@ Every branch:
     record auditor call cost (token counts, latencyMs) and the final decision → telemetry (see below).
 The listener never throws; every internal exception converges to one of (allow|deny|ask).
 ```
+
+**Auditor-model note (verified in rc.7)**: the DeepSeek adapter now supports `reasoningEffort: 'off'|'low'|'high'|'max'` (`packages/llm/llm-deepseek/src/index.ts:70/95`), and the `'low'` tier was added between rc.5 and rc.7 — this widens auditor-model latency choices. There is still no cheap-tier primitive, so the existing risk about auditor model cost (see Risks 3) stands.
 
 Secondary listener on `fs/write-intent` (M3): publish-path classification only — when `displayPath` matches a publish pattern and the actor is not a toolchain this plugin has already audited, non-allowlisted writes are blocked under enforce (**the exact veto semantics are unverified, see Risks**); it performs **no content auditing** (no content is visible); content guarding is borne entirely by the pre-execute chain. The two chains complement each other: pre-execute audits "write content that flows through tools", fs-intent backstops "write paths that bypass the tool layer".
 

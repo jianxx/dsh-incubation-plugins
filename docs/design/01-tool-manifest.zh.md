@@ -1,6 +1,7 @@
 # 01 tool-manifest — 工具元数据共享基座
 
 > 状态: design (not started) | Tier: 1(基座) | 包: packages/verification/tool-manifest | 依赖: 无(仅 cordis + dsh core 类型) | 消费者: 02 claim-contracts, 09 token-wall, 10 verified-tools
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -44,7 +45,7 @@ permission-rules(dsh-cc-plugins)已示范了缺口:为做 plan-mode/acceptEdits 
 已逐一核实的接缝(文件:行号):
 
 - **服务注册模式**(cordis `Service`):
-  `dsh-cc-plugins/packages/interaction/permission-rules/src/index.ts:153`
+  `dsh-cc-plugins/packages/interaction/permission-rules/src/index.ts:154`
   (`class PermissionRulesService extends Service`,构造函数内 `super(ctx, 'permissionRules')`,
   `static inject = ['tools']`,并用 `declare module '@deepseek-ai/cordis' { interface
   Context { permissionRules: ... } }` 做类型声明合并)。tool-manifest 照此模式挂
@@ -54,14 +55,14 @@ permission-rules(dsh-cc-plugins)已示范了缺口:为做 plan-mode/acceptEdits 
   `deepseek-harness/packages/core/tools/src/index.ts` 中
   `ToolRuntime extends Service`(:787,`super(ctx, 'tools')`),公共面:
   `get(name, scope?): ToolDefinition | undefined`(:1204)、
-  `schemas(scope?): ToolSchema[]`(:1234)、`guard()`(:1110)、
+  `schemas(scope?): ToolSchema[]`(:1234)、`guard()`(:1114)、
   `tools/change` 事件(:207,注册/注销通知,供覆盖率 lint 增量刷新)。
   `ToolSchema = { name: string; description: string; parameters: Record<string, unknown> }`
-  (`deepseek-harness/packages/llm/llm/src/types.ts:312`)。
+  (`deepseek-harness/packages/llm/llm/src/types.ts:333`)。
 - **glob 匹配语义**(与 permission-rule 对齐):
   `permission-rules/src/parser.ts:27` `matchContent`——`*` 为通配、`:*` 为前缀,
   manifest 的 `pattern` 字段复用同一语义,避免第二套匹配方言。
-- 执行流:`tools/pre-execute` 监听器形态见 permission-rules/src/index.ts:216。
+- 执行流:`tools/pre-execute` 监听器形态见 permission-rules/src/index.ts:217。
 
 工具枚举的**读取方向**:tool-manifest 监听 `tools/change` + 调用 `ctx.tools.schemas()`
 做覆盖率统计;**绝不**反向要求 dsh 工具注册时携带新字段(上游零改动,纯插件侧叠加)。
@@ -126,20 +127,44 @@ egress 判定由 token-wall 对 payload 内容独立把关,清单层不替它背
 
 | 工具 | effectClass | disclosureClass | failureSemantics | 幂等/理由 |
 |---|---|---|---|---|
-| `read`,`list`,`glob`,`grep`(fs-search) | `readonly` | `none` | `atomic` | 只读;幂等键 = path/pattern 参数,纯内容寻址 |
-| `write`,`str_replace_editor` | `write-local` | `none` | `atomic` | 改本地文件,失败即无写;幂等键 = file_path+内容哈希 |
+| `read`,`read_image`,`glob`,`grep`(fs-search) | `readonly` | `none` | `atomic` | 只读;幂等键 = path/pattern 参数,纯内容寻址 |
+| `write`,`edit`,`str_replace_editor` | `write-local` | `none` | `atomic` | 改本地文件,失败即无写;幂等键 = file_path+内容哈希 |
 | `bash`,`pwsh` | `side-effecting` | `egress-payload` | `timeout-ambiguous` | 命令可触网可改动系统;超时不代表未执行;不重试,retryProbe 由调用方自带 |
+| `run_code` | `side-effecting` | `none` | `timeout-ambiguous` | 在代码运行时执行模型编写的程序;超时不代表未执行;绑定通信只在执行环境内 |
 | `skill` | `readonly` | `none` | `atomic` | 仅加载指令文本入上下文,本体无写;引起的后续动作归后续工具负责 |
-| `todo` | `write-local` | `none` | `atomic` | 会话内状态;幂等键 = 完整条目集 |
-| `goal` | `authority-change` | `none` | `atomic` | 改变 agent 目标栈,属于权限/意图面变更,gate 类插件须单独过问 |
-| `subagent`,`fork` | `side-effecting` | `none` | `timeout-ambiguous` | 派生的子代理会自行调用工具;child 是否已启动在超时点不可知 |
+| `todo_write` | `write-local` | `none` | `atomic` | 会话内状态;幂等键 = 完整条目集 |
+| `get_goal` | `readonly` | `none` | `atomic` | 纯查询当前目标与 revision |
+| `create_goal` | `write-local` | `none` | `atomic` | 创建会话目标记录(要求直接人类请求);幂等键 = objective 文本 |
+| `update_goal` | `authority-change` | `none` | `atomic` | edit/pause/resume/complete/blocked 改变会话续跑策略,属于权限/意图面变更,gate 类插件须单独过问 |
+| `subagent` | `side-effecting` | `none` | `timeout-ambiguous` | 派生的子代理会自行调用工具;child 是否已启动在超时点不可知 |
 | `report`(subagent 回报) | `write-local` | `none` | `atomic` | 只写父会话上下文 |
 | `list_agents` | `readonly` | `none` | `atomic` | 纯查询 |
-| `jobs`,`workflow`,`ralph` | `side-effecting` | `none` | `timeout-ambiguous` | 调度/编排后台执行;提交后主执行体可能已在跑 |
+| `interrupt_agent`,`send_message` | `side-effecting` | `none` | `atomic` | 向运行中的子代理注入/中断——改的是另一个 agent 的运行,不是本地文件 |
+| `job_output`,`job_list` | `readonly` | `none` | `atomic` | 纯查询后台任务状态与输出 |
+| `job_kill` | `side-effecting` | `none` | `timeout-ambiguous` | 终止后台任务;已执行的步骤不因 kill 而回滚 |
+| `ralph`,`workflow` | `side-effecting` | `none` | `timeout-ambiguous` | 编排 fresh-child / 多代理后台执行;提交后主执行体可能已在跑 |
 | `web_search` | `external-disclosure` | `egress-payload` | `atomic` | query 出网至搜索提供方,本身就是披露动作;同一 query 重发不新增披露,幂等键 = query+日级时间桶 |
+| `web_fetch` | `external-disclosure` | `egress-payload` | `atomic` | 默认注册(`packages/web/tool-web/src/index.ts:41,54`,`fetch: true`);抓取的 URL 本身即披露 payload |
+| `lsp` | `readonly` | `none` | `atomic` | 对语言服务器表面的纯查询 |
+| `terminal_open`,`terminal_close`,`terminal_list`,`terminal_read` | `side-effecting` | `none` | `atomic` | 创建/销毁/观察共享终端会话——open/close 会改会话状态,故不入 readonly |
+| `terminal_send`,`terminal_signal` | `side-effecting` | `none` | `timeout-ambiguous` | 驱动终端会话内命令执行;超时不代表未执行(同 bash 家族理由) |
+| `schedule_create`,`schedule_delete` | `write-local` | `none` | `atomic` | 只改写一条持久提醒记录;幂等键 = 记录字段(见脚注) |
+| `schedule_list` | `readonly` | `none` | `atomic` | 纯查询提醒记录 |
+| `session_search`,`session_trace`,`session_event_read`,`session_event_search`,`session_event_trace` | `readonly` | `none` | `atomic` | 对已持久化 session/事件历史的纯查询;幂等键 = 查询参数,纯内容寻址 |
 
-(web_fetch 在上游已禁用,不入清单;若日后启用,默认 `external-disclosure` +
-`egress-payload` + `publish` 仅当目标为公共站点。)
+schedule_create/delete 只改写一条持久提醒记录;该记录的用户可见效果(未来的通知)是延迟发生的副作用,而非本次调用即生效。schedule_* 是提醒,不是调度器。
+
+- `fork` 不是独立工具:tool-subagent 注册一个工具,名字取自 `toolName` 配置
+  (`packages/subagent/tool-subagent/src/index.ts:83`,默认 `subagent`;随包
+  profile 还以 `subagent_fork` 别名暴露同一包)。提供方选择是
+  `SubagentProvider` 层的事,不是 tool-manifest 的行。
+- `plan` 是斜杠命令(`packages/plan/plan-mode/src/index.ts:271`,
+  `commands.register`),不是工具;该包的工具是 `exit_plan_mode`,把完成的
+  计划呈交直接人类评审——出现在 profile 中时归 `authority-change`
+  (权限/意图面变更)。
+- 动态 MCP 工具继续落入 fail-closed 默认条目(未知 →
+  `side-effecting` / `timeout-ambiguous`);MCP server 作者可发布
+  plugin-declared 条目让特定工具豁免。
 
 ## 里程碑切分
 
@@ -175,8 +200,10 @@ egress 判定由 token-wall 对 payload 内容独立把关,清单层不替它背
 - **scope 维度的枚举**:`ctx.tools.schemas(scope?)` 的 `scope` 语义(per-agent
   变体工具)未逐行核实——覆盖率 lint 是否需要遍历所有 agent scope,待 M2 落地时
   以 `grep -n "ScopeKey" packages/core/tools/src/index.ts` 核实并补测。
-- **user-overlay 文件监听**:dsh 是否有现成配置文件 watch 设施(类似 settings
-  的 installSettingsSection)未核实;M1 先一次性读取,热更新降级为 open question。
+- **user-overlay 文件监听**:已核实——settings 面已自带该设施
+  (`installSettingsSection` 加 `settings/updated` 提交事件,
+  `packages/settings/settings/src/index.ts:863,:778`);剩余 open question 是
+  overlay 应否做成 settings 命名空间(天然继承热更新),而非单独 watch 文件。
 - **幂等键的 agentId 来源**:需要稳定的 per-agent 标识参与哈希;具体从
   `ToolExecution.agent` 取哪个字段,待 doc 10 立项时以其执行上下文为准核实。
 - **内容级参数 glob**:pattern 只匹配工具名;若消费者需要"bash 的某类命令单独

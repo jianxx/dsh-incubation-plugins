@@ -1,6 +1,8 @@
 # 11 silent-failure-watch — runtime detection and offline reproduction of non-crash failure classes
 
 > Status: design (not started) | Tier: 3 | Package: packages/observability/silent-failure-watch | Dependencies: none (schema consumed by doc 12)
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -122,6 +124,18 @@ Config fields of this package; no new mechanism needed.
 
 ### Data model / configuration (flag event schema [source of truth], per-detector config)
 
+> **Configuration (rc.7 onward)**: user-tunable knobs (here: the per-detector
+> enable/sample/threshold defaults) are declared through a settings namespace
+> (`settingsNamespace` + `installSettingsSection`,
+> `packages/settings/settings/src/index.ts:863`). Resolution layers: schema
+> defaults → the cordis composition entry (base) → the `settings.yaml` user
+> document. Values hot-reload via `settings/updated` and are readable at runtime
+> through `ctx.settings.describe()`. Registering a namespace exposes it — #2404
+> removed the apiproxy allowlists, so registration is the only exposure control
+> — which means both the web settings page and `settings.yaml` can edit it. The
+> cordis `apply(ctx, config)` second argument remains the composition-defaults
+> layer; the flag-event schema below is telemetry vocabulary, not configuration.
+
 **flag event** — this schema is the source of truth; doc 12 eval-harness consumes
 it keyed on the `schema` version; the event is merged into `SessionEventMap` via
 declaration merging; the payload is all JSON:
@@ -200,6 +214,20 @@ Location: `packages/observability/silent-failure-watch/scripts/` (run with tsx;
 entry point package.json `scripts.watch-replay`). Input = persisted session.jsonl
 (same format as `ReplayConfig.file`; parseability by `parseSessionLog` is the
 acceptance criterion).
+
+**ReplayEnvelope note (verified against rc.7)**: upstream commit `7e95a00c8a`
+(`fix(llm): align replay state with assembled content and degrade unusable
+state`) makes the persisted replayState a typed versioned-2 `ReplayEnvelope`
+(`packages/llm/llm-pi-ai/src/replay.ts`, `packages/llm/llm/src/assembler.ts`);
+foreign / malformed / wrong-version state now degrades to a provider-neutral
+conversion with an `onReplayDegrade` diagnostic
+(`packages/llm/llm-pi-ai/src/context.ts:87-148`) instead of hard-failing with
+`INVALID_REPLAY_STATE`. Consequences for this doc: max-tokens-then-continue
+fixtures no longer hard-fail replay, and `session.jsonl` fixtures recorded on
+rc.5-era trees remain valid inputs. The `llm-replay` test-support API itself is
+unchanged — verified with `git diff e3e27afa2e master --
+packages/test-support/llm-replay` (only a version-string bump), so the API
+surface cited in "Surfaces and seams" holds as-is.
 
 **`watch-replay run --session s.jsonl --fault <class> --at-call k --tool <name>`**:
 root cordis ctx → `mountAgentLoopTestDependencies` →

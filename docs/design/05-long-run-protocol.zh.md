@@ -1,6 +1,7 @@
 # 05 long-run-protocol — 长跑会话协议
 
 > 状态: design (not started) | Tier: 1 | 包: packages/session/long-run-protocol | 依赖: 无(可选集成 04)
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -62,10 +63,10 @@ Planner/Generator/Evaluator 多重角色(Evaluator 由 04 承担);不改上游 `
    `{cwd, parentSession, seedLength}`(`:1087-1094`;header 字段定义
    `packages/core/session/src/types.ts:61-80`)— fork 血缘天然可溯。
 2. **可见上下文来源**:agent 发请求时从 log 投影 — `this.session.deriveMessages()`
-   (`packages/core/agent-loop/src/agent.ts:341`),surface 逐节点投影规则见
-   `packages/core/session/src/surface.ts:74-76`。→ fork 后子会话的初始可见上下文
+   (`packages/core/agent-loop/src/agent.ts:341`),surface 逐节点投影规则
+   `deriveEventMessage` 见 `packages/core/session/src/surface.ts:83`。→ fork 后子会话的初始可见上下文
    = seed 前缀的事件投影;**seed 事件不触发 `session/event` firehose**
-   (构造 seed 不发布,`index.ts:451-455` firstLiveSeq 注释)。因此 handoff 文本
+   (构造 seed 不发布,`index.ts:450-472` firstLiveSeq 注释)。因此 handoff 文本
    不能指望"写进子会话 log 再被看见"(未驱动会话的 surface append 未验证,
    见风险 R1),应走 resume 时的注入缝(第 6 条)。
 3. **系统提示缝**:`ctx.systemPrompt.section({name, order, text})` 返回精确
@@ -74,7 +75,7 @@ Planner/Generator/Evaluator 多重角色(Evaluator 由 04 承担);不改上游 `
    同名重复注册即抛、scoped 覆盖 global(按 name)、空 text 在渲染时被丢弃
    (`renderPrompt` `:212-217`)。elementprovider 每次组装执行,`AssembleContext`
    经声明合并携带 `agent?`(`packages/core/agent/src/runtime-types.ts:16-20`),
-   调用侧恒填 `{agent, scope: agent}`(`packages/core/agent/src/dispatch.ts:174-176`,
+   调用侧恒填 `{agent, scope: agent}`(`packages/core/agent/src/dispatch.ts:175`,
    调用点 `agent-loop/src/agent.ts:230`)→ **全局注册一个 provider,按
    `context.agent?.session.id` 判断是否处於长跑模式**,无需 scoped 与 global 的
    互顶。order 取惯例空档 200–299(工具指引 100–199 之后,identity/persona 之前
@@ -88,10 +89,13 @@ Planner/Generator/Evaluator 多重角色(Evaluator 由 04 承担);不改上游 `
 5. **轮末拦截缝**:`agent/turn-stopping`,`@mode serial`,payload
    `{ agent, turn, signal }`(`packages/core/agent/src/runtime-types.ts:261-278`);
    **只在自然收尾触发** — turn 已得出 `turnEnds` 且 steering inbox 为空
-   (`packages/core/agent-loop/src/agent.ts:295`);listener 抛异常 → turn 以
-   error.conclusion(`:302-315`),**所以 listener 永不 throw**(doc 00 原则 2,
+   (`packages/core/agent-loop/src/agent.ts:295-296`);listener 抛异常 → turn 以
+   error.conclusion(`:304-315`),**所以 listener 永不 throw**(doc 00 原则 2,
    全程 try/catch 收口)。steer 续的是**同一个 open turn**(steer 后 inbox 非空,
    循环走 `next-step` 而不是关 turn,`:299-300`)→ "每轮 cap" 按 `turn` 键计数。
+   测试钉定注:上游 PR #2535 增加了 web e2e 测试,断言完整 `turn/end` reason 等于
+   `{kind:'completed'}`(仅测试收紧;运行时事件/payload/触发条件均无变化)——
+   该 reason 形态已被上游测试钉定;只依赖文档化形态。
 6. **steer/inject 归因缝**:`agent.steer(message: UserMessage): void`
    (`runtime-types.ts:127-133`)注入下一步 steering;`agent.inject(...)` 排队
    下一个 pre-step 的 model-facing context、不唤醒 driver(`:135-143`)。
@@ -123,9 +127,9 @@ Planner/Generator/Evaluator 多重角色(Evaluator 由 04 承担);不改上游 `
     (`packages/llm/token-meter/src/index.ts:74`,measure `:116`;类型
     `token-meter/src/types.ts:22-36`)。模型容量解析照 compaction-basic 先例:
     `session.requestHeader()?.config` 取路由 {provider, model}
-    (`packages/compaction/compaction-basic/src/index.ts:52-60`),再
+    (`packages/compaction/compaction-basic/src/index.ts:55`),再
     `ctx.llm.resolveModelInfo(provider, model).context.contextWindow`(同文件
-    `:294-303`)。fill% = totalTokens / contextWindow。
+    `:293`)。fill% = totalTokens / contextWindow。
 11. **shell 缝(可选)**:`ctx.shell: ShellExecutor`(`packages/shell/shell/src/
     index.ts:41-43`),`resolve(request): ShellExecSpec` + `run(spec)`
     (`:85, :93`)— workspace-dirty 检查与 init.sh 首次 commit 经它,服务缺失时
@@ -341,7 +345,7 @@ pre-step 的 context 批次含 form:'recall' handoff;(c) 非法 boundary
 - **R3 auto-suggest 依赖两个可选服务**:`ctx.get('tokenMeter')` 服务键(spike:
   核 `llm/token-meter/src/index.ts` 的 declare module 键名)、
   `ctx.llm.resolveModelInfo` 可用性与 `contextWindow` 字段(照 compaction-basic
-  `:294-303` 先例)。任一缺失 → 记一次 skip 遥测后该会话不再提。**检查方法**:
+  `:293` 先例)。任一缺失 → 记一次 skip 遥测后该会话不再提。**检查方法**:
   在目标 profile 里打印一次二者存在性。
 - **R4 workspace-dirty 检查依赖 `ctx.shell` 与 git 可用**:沙箱或无 git 项目
   下 `git status --porcelain` 不可行 → warn 降级;**检查方法**:`ShellExecSpec`

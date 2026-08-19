@@ -1,6 +1,8 @@
 # 02 claim-contracts — admission layer for claims and output contracts
 
 > Status: design (not started) | Tier: 1 | Package: packages/verification/claim-contracts | Depends on: 01 tool-manifest
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -76,7 +78,7 @@ appears only under "Risks and open questions".
    `packages/core/tools/src/index.ts:175`:
    `(exec: ToolExecution, result: Readonly<ToolExecutionResult>, next: () => Promise<PostToolDecision>) => Promise<PostToolDecision>`.
    Plugins register via `ctx.on('tools/post-execute', handler)`.
-2. **Decision type — `PostToolDecision`** same file `:596-600`:
+2. **Decision type — `PostToolDecision`** same file `:597-601`:
    two variants of `{kind:'accept'; content?|value?; additionalContexts?}` plus
    `{kind:'block'; feedback: ContentBlock[]; additionalContexts?}`.
    Consumption point `postExecute()` (:1742-1781, verified): `block` replaces the
@@ -91,22 +93,27 @@ appears only under "Risks and open questions".
    handler **must never throw**, or the actionable feedback is lost; and block
    discards the tool-deferred context, keeping only the `additionalContexts`
    carried by the block decision itself.
-3. **Result shape — `ToolExecutionResult`** same file `:556-580`: success carries
-   `value: JsonValue + content: ContentBlock[]`, failure carries
-   `error: ToolFailure`; validators read the structured `value` first, `meta` may
-   serve as a domain-side aid.
+3. **Result shape — `ToolExecutionResult`** same file: success
+   `ToolExecutionSuccess` at `:556` carries
+   `value: JsonValue + content: ContentBlock[]`, the union at `:580`, failure
+   carries `error: ToolFailure` (type `ToolFailure` `:481`); validators read the
+   structured `value` first, `meta` may serve as a domain-side aid.
 4. **Claim-audit seam — `session/event` observer**
    `packages/core/session/src/index.ts:76`:
    `(session: Session, event: SessionEvent) => void` (pure observer, no return
-   value). Event payloads `packages/core/session/src/types.ts:243-297`:
-   `assistant/message` `{turn, step, message, usage?}`, `tool/call`
+   value). Event payloads `packages/core/session/src/types.ts:252-291`
+   (payload keys at `:273-291`): `assistant/message`
+   `{turn, step, message, usage?}`, `tool/call`
    `{turn, step, callId, name, arguments}`, `tool/result`
    `{turn, step, message, error?, meta?}`, `turn/end {turn, reason}`
-   (`TurnEndReason` enum `:155-177`: completed/aborted/blocked/error/max-tokens/
-   interrupted). The event envelope `:415-447` carries `seq` (monotonic within
-   the session), `time`, `sourceEventSeqs` — evidence references are expressed
-   directly as seqs. See the consumption pattern at
-   `packages/core/agent-loop/src/runtime-context.ts:46`.
+   (`TurnEndReason` enum `:155-176`: completed/aborted/blocked/error/max-tokens/
+   interrupted). The event envelope carries `seq` (monotonic within the session,
+   `:407-408`), `time`, and `sourceEventSeqs` (`:432`) — evidence references are
+   expressed directly as seqs. Note: the full `turn/end` reason object for the
+   completed case, `{kind:'completed'}`, is now pinned by an upstream web e2e
+   test (PR #2535; test-only tightening) — the reason shape is test-pinned, so
+   claim verification must not rely on extra reason fields. See the consumption
+   pattern at `packages/core/agent-loop/src/runtime-context.ts:46`.
 5. **Telemetry seam — `session-telemetry/record` waterfall**
    `packages/session/session-telemetry/src/index.ts:43`, record shape
    `SessionTelemetryRecord` same file `:64-` (`channel: 'ledger'|'ops'`,
@@ -122,6 +129,18 @@ appears only under "Risks and open questions".
    `packages/skill/skill-filesystem/src/index.ts:246`, source `project-dsh`).
 
 ### Data model / configuration (contract + validator schema, modes)
+
+> **Configuration (rc.7 onward)**: user-tunable knobs (here: the global
+> off/audit/enforce mode default below) are declared through a settings
+> namespace (`settingsNamespace` + `installSettingsSection`,
+> `packages/settings/settings/src/index.ts:863`). Resolution layers: schema
+> defaults → the cordis composition entry (base) → the `settings.yaml` user
+> document. Values hot-reload via `settings/updated` and are readable at runtime
+> through `ctx.settings.describe()`. Registering a namespace exposes it — #2404
+> removed the apiproxy allowlists, so registration is the only exposure control
+> — which means both the web settings page and `settings.yaml` can edit it. The
+> cordis `apply(ctx, config)` second argument remains the composition-defaults
+> layer; `.dsh/contracts/*.yml` stays the per-project layer below it.
 
 Contract files (YAML, one per file, `.dsh/contracts/*.yml`; built-in contracts
 ship with the package in the same format):
@@ -328,9 +347,9 @@ existing API.
 ---
 
 _Verified seams (all path:line citations re-read in 2026-08)_: `packages/core/tools/src/index.ts`
-:175 / :556-600 / :1742-1781; `packages/core/tools/tests/tools.spec.ts:856-872`;
+:175 / :481 / :556-580 / :597-601 / :1742-1781; `packages/core/tools/tests/tools.spec.ts:856-872`;
 `packages/core/session/src/index.ts:76`; `packages/core/session/src/types.ts`
-:155-177 / :243-297 / :415-447; `packages/session/session-telemetry/src/index.ts`
+:155-176 / :252-291 / :407-408 / :432; `packages/session/session-telemetry/src/index.ts`
 :43 / :64- / :104; `packages/core/agent-loop/src/agent.ts:296`;
 `packages/core/agent-loop/src/runtime-context.ts:46`;
 `packages/skill/skill-filesystem/src/index.ts:246`.

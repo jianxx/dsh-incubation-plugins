@@ -1,6 +1,7 @@
 # 12 eval-harness — harness 演化的信用纪律
 
 > 状态: design (not started) | Tier: 3 | 包: packages/eval/eval-harness + scripts/bench/ | 依赖: 03, 11 的事件 schema
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -59,6 +60,13 @@ Demystifying Evals 补齐工程面:task/trial/grader/transcript/outcome 五个�
   "settingsHash":"sha256:…","model":"deepseek-v4-pro","seed":null,"temperature":0.0,"patchFiles":["bench/variants/trace-on.cordis.patch.yml"]},
  "budget":{"maxTurns":40,"maxTokens":200000,"maxWallSeconds":1200}}
 ```
+
+fingerprint 注(rc.7):`settingsHash` 现在可由真实运行时读取计算——
+`ctx.settings.describe()` 返回逐 namespace 的 resolved/base/user 值
+(`packages/settings/settings/src/index.ts:479`)——不必只对组合文件做哈希。但插件
+VERSIONS 仍不可运行时内省:plugin-inventory 条目只携带
+entryId/moduleName/enabled/fiberPhase(`packages/host/plugin-inventory/src/types.ts:17-22`),
+版本继续来自 variant registry/lockfile。
 
 `bench/tasks/{train,heldout,sealed}/<id>.yml` — task registry:
 
@@ -123,7 +131,7 @@ budget: {maxTurns: 40, maxTokens: 200000, maxWallSeconds: 1200}
 
 1. **token 记账粒度**:trial 预算的 token 数来自 `assistant/chunk` 的 usage 字段与 `compaction/summary` 记录的 usage(llm-replay README 提到 "the recorded usage when present"),但**逐 turn 的确切字段名未在本文核实**。M1 开工前检查:上游 session jsonl 事件 schema 文档 + doc 03 落地稿;若逐事件缺失 usage,降级为 walltime+turn 双帽并在 transcript 标 `tokenBudget: unavailable`。
 2. **headless 无可验证的 max-turns/max-tokens flag**(README 未列)。M2 的 cap 执行依赖 runner 侧 SIGTERM(wall/turn 计数来自 `session/event` 的 `turn/end`)。检查: `grep -rn "maxTurn\|maxToken" packages/bundle/headless/src` + agent loop 的核心配置;若核心已有限额配置,改为配置注入优先、kill 兜底。
-3. **SDK/headless 双驱动的一致性**:两驱动 prompt 组合不同(SDK 走 `agent-spine` demo 组合,headless 走 bundle patch),fingerprint 必须含驱动 id,跨驱动 comparison 默认禁止(score 拒绝),除非显式声明。
+3. **SDK/headless 双驱动的一致性**:两驱动 prompt 组合不同(SDK 走 `agent-spine` demo 组合,headless 走 bundle patch),fingerprint 必须含驱动 id,跨驱动 comparison 默认禁止(score 拒绝),除非显式声明。rc.7 补充:上游 PR #2462 提交了极简组合的 model-visible 黄金快照(`scripts/snapshots/python-sdk-single-exe/minimal/model-visible.json`)——即上游自家对 SDK 驱动组装 prompt/tools 的漂移检测器;fingerprint 的驱动 id 部分可引其为一等参照。
 4. **沙箱强度**:`minimal.cordis.yml` 示例是 `sandbox-policy: danger-full-access`。bench trial 的 setup 可能写仓库——runner 必须用独立临时 workspace(worktree/解包),并在 validity 门检查越界写。
 5. **上游版本钉住**:trial 依赖上游 dsh 树。仓内应提交 `bench/upstream.lock`(commit sha + 安装方式说明);CI/live 评测对 lock 不一致报警。确切形式在 M1 定稿前与现有 profile 同步脚本对齐(检查 `scripts/sync-local-profile.sh` 的现有约定)。
 6. **并发 subagent 的重放**:llm-replay 按首调顺序绑定,声明了 sequential-delegation 假设(其 Known Limitations)。含并发 subagent 的变体(如 06 issue-pilot 的多分支)不可确定性重放——这类变体只能活体跑,fingerprint 标 `deterministic: false`。

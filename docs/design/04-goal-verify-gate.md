@@ -1,6 +1,8 @@
 # 04 goal-verify-gate — the pre-completion verification gate
 
 > Status: design (not started) | Tier: 1 | Package: packages/goals/goal-verify-gate | Depends on: none (optional integration with 03)
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -81,7 +83,7 @@ agent?, signal}` (`:314-337`, `:379-384`) — matched on
 2. **No veto seam at the service layer**: `ctx.goals.complete`
    (`packages/goal/goal/src/index.ts:336-346`) goes straight to the
    transition; GoalService has no pre-mutation hook; `goal/changed` is a
-   post-commit emit notification (`:541-558`, declared at
+   post-commit emit notification (`:557`, declared at
    `packages/goal/goal/src/domain.ts:104-116`) — listener failures are
    swallowed but cannot veto. Wrapping `goals` via same-name cordis service
    re-registration is infeasible (service keys are single-owner;
@@ -100,7 +102,7 @@ agent?, signal}` (`:314-337`, `:379-384`) — matched on
    (`packages/core/agent/src/runtime-types.ts:261-278`): "a listener that
    objects steers (`agent.steer(...)`) … fresh steering runs another step,
    none closes the turn"; `agent.steer(message: UserMessage): void`
-   (`:127-133`). A steer continues **the same open turn** (the turn is not
+   (`:133`). A steer continues **the same open turn** (the turn is not
    yet closed), the original turn's authority context (direct-human or
    goal-round) is preserved, and the model may still legitimately call
    complete after being steered. The attribution shape follows tool-goal's
@@ -137,8 +139,8 @@ callId?, reason?, signal? }`
    session-event-required gate): the `session/event` observer,
    `tool/call {turn, step, callId, name, arguments}` /
    `tool/result {turn, step, message, error?, meta?}` /
-   `turn/end {turn, reason}` (`packages/core/session/src/types.ts:243-297`,
-   `:155-177`; already verified in doc 02).
+   `turn/end {turn, reason}` (`packages/core/session/src/types.ts:252-291`,
+   `:155-176`; already verified in doc 02).
 8. **State-storage location**: the `.dsh/` project directory is an existing
    upstream convention (`<projectRoot>/.dsh/skills` at
    `packages/skill/skill-filesystem/src/index.ts:246`). A gate declaration is
@@ -158,6 +160,18 @@ callId?, reason?, signal? }`
    syntax untouched.
 
 ### Data model / configuration (gate declaration schema, modes, stall policy)
+
+> **Configuration (rc.7 onward)**: user-tunable knobs (here: the global gate
+> mode and stall-policy defaults) are declared through a settings namespace
+> (`settingsNamespace` + `installSettingsSection`,
+> `packages/settings/settings/src/index.ts:863`). Resolution layers: schema
+> defaults → the cordis composition entry (base) → the `settings.yaml` user
+> document. Values hot-reload via `settings/updated` and are readable at runtime
+> through `ctx.settings.describe()`. Registering a namespace exposes it — #2404
+> removed the apiproxy allowlists, so registration is the only exposure control
+> — which means both the web settings page and `settings.yaml` can edit it. The
+> cordis `apply(ctx, config)` second argument remains the composition-defaults
+> layer; per-goal `GateSpec.mode` overrides apply below it.
 
 ```ts
 type GateMode = "off" | "audit" | "enforce";
@@ -422,16 +436,16 @@ files are touched.
 _Verified seams (paths and line numbers all re-verified on 2026-08-17)_:
 `packages/goal/tool-goal/src/index.ts:41-43 / :307-308 / :313-324`;
 `packages/goal/tool-goal/src/authority.ts:65-74 / :101-108`;
-`packages/goal/goal/src/index.ts:336-346 / :541-558`;
+`packages/goal/goal/src/index.ts:336-346 / :557`;
 `packages/goal/goal/src/types.ts:59-68`;
 `packages/goal/goal/src/fold.ts:87-112`;
 `packages/goal/goal/src/domain.ts:104-116`;
 `packages/goal/goal-round-driver/src/index.ts:48-58 / :174-178`;
 `packages/goal/command-goal/src/index.ts:14 / :33-43`;
 `packages/core/tools/src/index.ts:142-152 / :314-337 / :379-384 / :583-591 / :1690-1726`;
-`packages/core/agent/src/runtime-types.ts:127-143 / :261-278`;
+`packages/core/agent/src/runtime-types.ts:133 / :261-278`;
 `packages/core/session/src/index.ts:112-115 / :436-446`;
-`packages/core/session/src/types.ts:155-177 / :243-297`;
+`packages/core/session/src/types.ts:155-176 / :252-291`;
 `packages/session/session-telemetry/src/index.ts:35-46 / :64-86 / :94-104 / :144-151`;
 `packages/interaction/user-approval/src/index.ts:153-174 / :188-190`;
 `packages/interaction/user-approval/src/types.ts:29`;

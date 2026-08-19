@@ -1,6 +1,7 @@
 # 10 verified-tools — Idempotency, Verify-Before-Retry, and Argument Admission
 
 > Status: design (not started) | Tier: 3 | Package: packages/verification/verified-tools | Depends on: 01
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -48,7 +49,7 @@ referred to below as dsh):
    handled by the plugin `packages/guard/timeout-policy`, which produces an
    ordinary `ToolExecutionFailure` (`isError:true`,
    `error.info = { name:'ToolTimeoutError', code:'TOOL_TIMEOUT' }`,
-   `packages/guard/timeout-policy/src/index.ts:25,41-48`), so the wrapper can
+   `packages/guard/timeout-policy/src/index.ts:25,46`), so the wrapper can
    route on `error?.info.code === 'TOOL_TIMEOUT'`. Core only validates the
    `timeoutMs` option (`packages/core/tools/src/schema.ts:499-500`).
 2. **Duplicate calls already get an advisory reminder**:
@@ -82,11 +83,11 @@ consistent telemetry for any of the above events.
    `exec.signal`; the call identity is immutable (`index.ts:155-158,386-394`).
    Registration shape: inside `apply(ctx: Context)`,
    `ctx.on('tools/execute', async (exec, next) => ...)` (cf.
-   `packages/guard/timeout-policy/src/index.ts:50-58`).
+   `packages/guard/timeout-policy/src/index.ts:55` (`apply`).
 2. **pre-execute veto**: `'tools/pre-execute'(exec, next)` (`index.ts:152`),
    deciding `{kind:'allow'} | {kind:'deny'; reason} | {kind:'ask'; reason}`
    (`index.ts:588-603`); a `deny` materializes as an isError result of
-   `Error: <reason>` handed to the model (`index.ts:1493-1500`) — i.e. the
+   `Error: <reason>` handed to the model (`index.ts:1492-1497`) — i.e. the
    recovery channel for corrective feedback. **pre-execute cannot rewrite
    arguments** (`index.ts:585-587`), so recovery can only work by using the
    deny-reason to prompt the model to fix and re-send (consistent with the
@@ -105,9 +106,10 @@ consistent telemetry for any of the above events.
    directly.
 4. **ASK escalation**: `ctx.approval.request({agent, toolName, callId?, reason?, signal?})`
    → `'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'`
-   (`packages/interaction/user-approval/src/index.ts:153-170,257`;
-   `types.ts:28`). `'unavailable'` fails closed; `request()` must run inside an
-   open turn (`index.ts:264-272`), which the wrapper naturally satisfies. It
+   (`packages/interaction/user-approval/src/index.ts:153-165, :257`;
+   `types.ts:29`). `'unavailable'` fails closed; `request()` must run inside an
+   open turn (`request()` at `:257`, open-turn check at `:259-265`), which the
+   wrapper naturally satisfies. It
    does not bypass the `approval/request` waterfall (shared principle 1).
 5. **Telemetry**: `'session-telemetry/record'` is a synchronous redaction
    transform, not an "emit event" API
@@ -232,7 +234,7 @@ All writes go through `writeFileAtomic`.
      `ctx.approval.request({agent, reason, ...})`, where `'allowed-once'` =
      permit one retry, `'rejected'/'cancelled'` = return the original timeout
      error, `'unavailable'` = fail-closed (upstream semantics,
-     `user-approval/types.ts:28`).
+     `user-approval/types.ts:29`).
 4. The whole probe lifecycle emits `probe-run` telemetry (count, verdict
    distribution, latency).
 
@@ -371,9 +373,14 @@ verify-catch path actually triggers and no duplicate PR is created.
    and how the Code Mode parent restriction (`index.ts:329-334`) concretely
    behaves on the probe path — validate with a spike before M2 starts: "nested-
    dispatch a readonly tool inside a wrapper and observe approval and
-   interception behavior".
+   interception behavior". Verified in rc.7: under Code Mode, a non-error
+   subtool result containing image blocks is additionally delivered via
+   `exec.deferContext(...)` as a plugin-attributed user message (source plugin
+   `tools-code-mode`, `packages/core/tools/src/code-mode.ts:564-569`) — a
+   wrapper/probe observing `result.content` must not assume it equals the
+   final model-visible surface when image blocks are present.
 4. **The deny reason is plain text** (`Error: <reason>`,
-   `index.ts:1493-1500`), with no structured fields; a long violation list
+   `index.ts:1492-1497`), with no structured fields; a long violation list
    could blow up the display. Check item: whether that `Error:`-prefixed text
    has length truncation; if necessary, put only the first N entries in the
    reason + "M total".
@@ -385,7 +392,7 @@ verify-catch path actually triggers and no duplicate PR is created.
    records as observe-only without short-circuiting — to be settled by M1
    experiments.
 6. **Approval availability**: `request()` requires an open turn
-   (`user-approval/src/index.ts:264-272`); environments with no UI answerer
+   (`user-approval/src/index.ts:257,259-265`); environments with no UI answerer
    (subagent/background) return `'unavailable'` → fail-closed. This is
    expected behavior, but the combined policy of `askThreshold` and background
    profiles needs to be documented, to avoid a degraded experience where every

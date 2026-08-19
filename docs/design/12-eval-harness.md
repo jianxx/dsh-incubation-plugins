@@ -1,6 +1,7 @@
 # 12 eval-harness — credit discipline for harness evolution
 
 > Status: design (not started) | Tier: 3 | Packages: packages/eval/eval-harness + scripts/bench/ | Depends on: the event schemas of 03, 11
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -59,6 +60,14 @@ Scope honesty: this doc is **not** a general-purpose benchmark suite. It is the 
   "settingsHash":"sha256:…","model":"deepseek-v4-pro","seed":null,"temperature":0.0,"patchFiles":["bench/variants/trace-on.cordis.patch.yml"]},
  "budget":{"maxTurns":40,"maxTokens":200000,"maxWallSeconds":1200}}
 ```
+
+Fingerprint note (rc.7): `settingsHash` can now be computed from a real runtime
+read — `ctx.settings.describe()` returns per-namespace resolved/base/user values
+(`packages/settings/settings/src/index.ts:479`) — instead of hashing only the
+composition file. Plugin VERSIONS, however, are still NOT runtime-introspectable:
+plugin-inventory entries carry only entryId/moduleName/enabled/fiberPhase
+(`packages/host/plugin-inventory/src/types.ts:17-22`), so versions keep coming
+from the variant registry/lockfile.
 
 `bench/tasks/{train,heldout,sealed}/<id>.yml` — task registry:
 
@@ -123,7 +132,7 @@ Verify: presubmit fails on a branch that deliberately breaks the sealed lock; th
 
 1. **Token accounting granularity**: a trial's token count comes from the usage fields of `assistant/chunk` and the usage recorded in `compaction/summary` (the llm-replay README mentions "the recorded usage when present"), but **the exact per-turn field names are not verified in this doc**. Check before M1 starts: the upstream session jsonl event schema docs + doc 03's landed draft; if per-event usage is missing, degrade to a walltime+turn double cap and mark `tokenBudget: unavailable` in the transcript.
 2. **Headless has no verifiable max-turns/max-tokens flag** (not listed in the README). M2's cap enforcement relies on runner-side SIGTERM (wall/turn counting comes from `turn/end` in `session/event`). Check: `grep -rn "maxTurn\|maxToken" packages/bundle/headless/src` + the agent loop's core configuration; if the core already has limit configuration, switch to configuration-injection first with kill as the fallback.
-3. **Consistency of the dual SDK/headless drivers**: the two drivers assemble prompts differently (SDK goes through the `agent-spine` demo assembly, headless goes through bundle patches); the fingerprint must include the driver id, and cross-driver comparisons are forbidden by default (score rejects them) unless explicitly declared.
+3. **Consistency of the dual SDK/headless drivers**: the two drivers assemble prompts differently (SDK goes through the `agent-spine` demo assembly, headless goes through bundle patches); the fingerprint must include the driver id, and cross-driver comparisons are forbidden by default (score rejects them) unless explicitly declared. rc.7 addition: upstream PR #2462 committed a model-visible golden snapshot of the minimal composition (`scripts/snapshots/python-sdk-single-exe/minimal/model-visible.json`) — upstream's own drift detector for the SDK driver's assembled prompt/tools; cite it as a first-class reference for the driver-id part of the fingerprint.
 4. **Sandbox strength**: the `minimal.cordis.yml` example is `sandbox-policy: danger-full-access`. Bench trial setup may write into the repo — the runner must use a separate temporary workspace (worktree/unpacked copy) and check for out-of-bounds writes at the validity gate.
 5. **Pinning the upstream version**: trials depend on the upstream dsh tree. The repo should commit `bench/upstream.lock` (commit sha + installation instructions); CI/live evaluations warn on lock mismatch. The exact form is to be aligned with the existing profile-sync script conventions before M1 is finalized (check the existing conventions of `scripts/sync-local-profile.sh`).
 6. **Replay of concurrent subagents**: llm-replay binds in first-call order, declaring a sequential-delegation assumption (its Known Limitations). Variants with concurrent subagents (e.g., 06 issue-pilot's multi-branch) cannot be deterministically replayed — such variants can only be run live, with the fingerprint marked `deterministic: false`.

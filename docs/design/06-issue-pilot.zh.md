@@ -1,6 +1,8 @@
 # 06 issue-pilot — issue 级任务控制面
 
 > 状态: design (not started) | Tier: 1 | 包: packages/control-plane/issue-pilot | 依赖: 01, 04, 05
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -71,6 +73,15 @@ branch/worktree,上下文隔离,仅 shepherd 处汇总);(3) WORKFLOW.md(YAML fro
    `ctx.shell` 的组合(见风险 R2)。
 
 ### 数据模型 / 配置
+
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮（此处即扫描间隔 / 并发 /
+> label 方案默认值）通过 settings 命名空间声明（`settingsNamespace` +
+> `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为
+> schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持
+> `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——
+> #2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与
+> `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层；
+> 下文的 on-disk issue 状态文件是状态而非配置。
 
 **Issue 状态文件** `.dsh/issue-pilot/<owner>/<repo>/<issue>.json`(原子写:tmp+rename):
 
@@ -226,6 +237,10 @@ gate 失败注入(改坏一个测试)确认 steer 回流消息带 `[issue-pilot:
 
 ## 风险与开放问题
 
+- R0 **状态行(对照 rc.7 复核)**:上游仍然没有 durable scheduler/cron;
+  `ctx.jobs` 的 JobRegistry 依旧是进程内契约(`packages/jobs/jobs/README.md:40`,
+  "The contract is in-process"),因此本文档自带的 on-disk 状态机 + 重启 reconciler
+  设计前提不变。
 - R1 **`ctx.jobs` 进程内契约**:重启丢 live job,reconciler 依赖 session persistence 才可
   `resume`;无 persistence 的组合下 `running` 中断只能重新 spawn——M2 前需确认目标部署组合
   挂载了 `session-persistence-*`(检查:组合 profile 的 plugins 列表)。

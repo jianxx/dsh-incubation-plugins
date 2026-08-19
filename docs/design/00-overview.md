@@ -7,6 +7,8 @@ Serving Plane"), revised after an independent review pass.
 Each document is one incubation work item, split into PR-sized milestones.
 Number order is the build order.
 
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
+
 ## Analytical frames (three lenses)
 
 1. **Three-layer verification stack** (layers are not substitutable):
@@ -42,9 +44,18 @@ CRAB-style OS checkpointing (sandbox internals), PatchOptic authority triples
    A throwing listener ends the turn with an error — listeners must never throw.
    Steer messages participate in round accounting, so plugin attribution must be
    set correctly.
-3. **Enforcement strength is a tunable config dial** (the SafetySentry
-   continuum): every gate-style plugin ships `off / audit / enforce` modes and
-   an adjustable ASK threshold; no hard-coded policy.
+3. **Enforcement strength is a declared, user-tunable dial** (the SafetySentry
+   continuum): every gate-style plugin declares its `off / audit / enforce`
+   modes and ASK threshold through an rc.7 settings namespace
+   (`settingsNamespace` + `installSettingsSection`,
+   `packages/settings/settings/src/index.ts:863`); resolution layers = schema
+   defaults → cordis composition entry (base) → `settings.yaml` user document;
+   hot-reload via `settings/updated`, runtime-readable via
+   `ctx.settings.describe()`. Registering a namespace is what exposes it
+   (#2404 removed the apiproxy allowlists — registration is the only exposure
+   control), and the cordis `apply(ctx, config)` second argument remains the
+   composition-defaults layer. The per-gate `off / audit / enforce` semantics
+   are unchanged; no hard-coded policy.
 4. **tool-manifest is the shared substrate**: effect classes, idempotency
    recipes, disclosure classes, verification probes — per-tool metadata lives in
    exactly one annotation mechanism (doc 01).

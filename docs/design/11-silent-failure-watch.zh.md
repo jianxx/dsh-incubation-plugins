@@ -1,6 +1,8 @@
 # 11 silent-failure-watch — 无崩溃失败类的运行时检测与离线复现
 
 > 状态: design (not started) | Tier: 3 | 包: packages/observability/silent-failure-watch | 依赖: 无(schema 供 12 消费)
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -106,6 +108,15 @@ interaction/commands/src/index.ts:27–56;命令名 `[a-z][a-z0-9_-]*`)。
 
 ### 数据模型 / 配置(flag event schema[source-of-truth]、各 detector 配置)
 
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮（此处即各 detector 的
+> 启用/采样/阈值默认值）通过 settings 命名空间声明（`settingsNamespace` +
+> `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为
+> schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持
+> `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——
+> #2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与
+> `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层；
+> 下文的 flag 事件 schema 是遥测词汇而非配置。
+
 **flag 事件**——本 schema 是 source-of-truth,doc 12 eval-harness 按
 `schema` 版本消费;事件经 declaration merging 并入 `SessionEventMap`,
 payload 全 JSON:
@@ -179,6 +190,18 @@ flag(按 turn 分组、detector×severity 统计、最新 K 条含 evidence seq 
 位置:`packages/observability/silent-failure-watch/scripts/`(tsx 运行,
 package.json `scripts.watch-replay` 入口)。输入 = 持久化 session.jsonl
 (与 `ReplayConfig.file` 同格式,`parseSessionLog` 可解析即验收标准)。
+
+**ReplayEnvelope 注记(已对照 rc.7 核实)**:上游提交 `7e95a00c8a`
+(`fix(llm): align replay state with assembled content and degrade unusable
+state`)把持久化的 replayState 变为带版本的 v2 `ReplayEnvelope`
+(`packages/llm/llm-pi-ai/src/replay.ts`、`packages/llm/llm/src/assembler.ts`);
+外来的/畸形的/版本不符的状态现在降级为 provider-neutral 的转换,并带
+`onReplayDegrade` 诊断(`packages/llm/llm-pi-ai/src/context.ts:87-148`),
+而不是以 `INVALID_REPLAY_STATE` 硬失败。对本文档的后果:max-tokens 后续接
+(max-tokens-then-continue)的 fixture 不再令 replay 硬失败;在 rc.5 时代树上
+录制的 `session.jsonl` fixture 仍是合法输入。`llm-replay` test-support API 本身
+未变——已用 `git diff e3e27afa2e master -- packages/test-support/llm-replay`
+核实(仅版本号变更),「表面与接缝」中引用的 API 面按原样成立。
 
 **`watch-replay run --session s.jsonl --fault <class> --at-call k --tool <name>`**:
 根 cordis ctx → `mountAgentLoopTestDependencies` →

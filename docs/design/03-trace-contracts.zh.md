@@ -1,6 +1,8 @@
 # 03 trace-contracts — 轨迹契约:在线门 + 离线评分
 
 > 状态: design (not started) | Tier: 1 | 包: packages/verification/trace-contracts | 依赖: 无(可选集成 01)
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -73,7 +75,7 @@ ASK 一律走上游 `approval/request` seam(overview 原则 1),standalone 可工
 3. **会话事件订阅**:`ctx.on('session/event', (session, event) => …)` —— 类型
    声明 `packages/core/session/src/index.ts:76`(`post-commit, fire-and-forget`,
    listener 失败被 log 并隔离);真实用法 `packages/core/session/src/invariant.ts:223`。
-   事件键(`packages/core/session/src/types.ts:236-291`,SessionEventMap)含
+   事件键(`packages/core/session/src/types.ts:252-291`,SessionEventMap)含
    `turn/start`、`turn/end`、`step/start`、`step/end`、
    `tool/call { turn, step, callId, name, arguments: string }`、`tool/result {…}`——
    序列/计数/参数三类规则的全部输入都从这来;`tool/call.arguments` 是 JSON 字符串,
@@ -85,10 +87,19 @@ ASK 一律走上游 `approval/request` seam(overview 原则 1),standalone 可工
    指标(compliance % 等)走 ops channel,`telemetry.op` 命名
    `trace-contracts.*`。
 5. **审批之外的 deny 反馈**:deny 的 `reason` 被 materialize 成
-   `Error: <reason>` 的 tool result(`:1490-1496`)——这正是恢复通道的载体:
+   `Error: <reason>` 的 tool result(`:1492-1497`)——这正是恢复通道的载体:
    reason 即模型下一轮能看到的反馈文本。
 
 ### 数据模型 / 配置(contract schema sketch)
+
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮（此处即全局 mode / ask 默认值，
+> `trace.yml` 各层在其下覆盖）通过 settings 命名空间声明（`settingsNamespace` +
+> `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为
+> schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持
+> `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——
+> #2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与
+> `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层；
+> `.dsh/trace.yml` 的 precedence（session > project > user）在其下生效。
 
 契约文件:`<repo>/.dsh/trace.yml`(project 级)与 `~/.dsh/trace.yml`(user 级);
 `/trace attach <file>` 可把契约绑到当前 session/goal。user 级提供默认值,

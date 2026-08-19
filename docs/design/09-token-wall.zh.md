@@ -1,6 +1,8 @@
 # 09 token-wall — 跨边界 token 流的传输前语义审计
 
 > 状态: design (not started) | Tier: 2 | 包: packages/security/token-wall | 依赖: 01
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -65,8 +67,8 @@ TokenWall 报告的参考点:ASR 12.5%、benign pass 97.4%、+0.69s/case;且其�
   (`user-approval/src/types.ts:29`)。
 - **`ctx.llm`** — `packages/llm/llm/src/index.ts:47-48`,runtime 仅暴露
   `stream(options: GenerateOptions)`(:913);`GenerateOptions`
-  (`packages/llm/llm/src/types.ts:320-356`)要求显式 `provider` + `model`,
-  辅助调用分类只有 `purpose: 'compaction'|'session-title'`(:355)——
+  (`packages/llm/llm/src/types.ts:341-377`)要求显式 `provider` + `model`,
+  辅助调用分类只有 `purpose: 'compaction'|'session-title'`(:376)——
   **无 cheapest/small 选型原语**,auditor 的 `{provider, model}` 由插件配置给出。
 - **`session-telemetry/record`** — `packages/session/session-telemetry/src/index.ts:43`;
   `SessionTelemetryRecord{channel:'ledger'|'ops', time, severity, attributes, body}`(:64)。
@@ -89,6 +91,10 @@ sink 表:名字匹配 `web_*`(query 参数)、`gh`(PR/issue/comment 正文)、�
 | `publish-file-write` | `write`/`edit` 工具且 `file_path` 命中 `publishPaths` glob(如 `docs/**`、`README*`、registry/插件清单);`localScratchPaths`(如 `.dsh/scratch/**`、`**/*.tmp`)命中则**非 sink** | 完整 `content` / edit patch(仅在 pre-execute 可见) | precheck;enforce 灰案 ASK |
 | `authority-change` | manifest `effectClass = authority-change`,或路径命中 credential/settings 模式(`.dsh/**/settings.json`、`**/.credentials*`、插件包根 `package.json`、权限模式变更工具) | 完整 args / content | **始终 ≥ ASK**(enforce 下并叠加审计;audit 档只记不拦) |
 | `memory-rule-write` | 工具命中的写入目标属于 rules-lifecycle store 命名空间(经工具参数路径识别,如 `.dsh/rules/**`) | 完整 content | precheck + 灰案 auditor |
+
+**已验证能力说明(rc.7)**:code mode 会把携带图片的 subtool 结果延迟注入——`packages/core/tools/src/code-mode.ts:564-569`,非错误结果若 content 含 image block,会再经 `exec.deferContext(...)` 以插件归属的 user message 推入(source plugin `tools-code-mode`);PR #2252 打通了 MCP/ACP 间耐久图片内容(`packages/acp/acp/src/content.ts`)。对本设计的推论:对 `exec.arguments` 的 payload-digest 预检看到的是图片 REF 而非原始字节;"tool-result image egress" sink 类列为未来工作。
+
+**配置声明（rc.7 起）**：本插件的用户可调旋钮通过 settings 命名空间声明（`settingsNamespace` + `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为 schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持 `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——#2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与 `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层,本包的旋钮(`mode`、`perSink`、`grayBand`、`auditor`、……)挂在该层。
 
 **配置**(插件 config,全部可调,遵守共享原则 3):
 
@@ -153,6 +159,11 @@ ToolExecution 到达
     记 auditor 调用成本(token 数、latencyMs)与最终决定 → telemetry(见下)。
 listener 永不 throw;一切内部异常收敛为 (allow|deny|ask) 之一。
 ```
+
+**auditor 模型说明(rc.7 已验证)**:DeepSeek 适配器现支持
+`reasoningEffort: 'off'|'low'|'high'|'max'`(`packages/llm/llm-deepseek/src/index.ts:70/95`),
+且 `'low'` 档是 rc.5 到 rc.7 之间新增——这拓宽了 auditor 模型的时延选择;
+但仍无 cheap-tier 原语,文档中关于 auditor 模型成本的既有风险(见风险 3)维持不变。
 
 `fs/write-intent` 上的副 listener(M3):仅做 publish 路径分类——`displayPath` 命中
 publish 模式且 actor 非本插件已审计过的 toolchain 时,enforce 下阻断非白名单写入

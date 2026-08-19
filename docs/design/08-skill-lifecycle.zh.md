@@ -1,6 +1,8 @@
 # 08 skill-lifecycle — 技能工件的准入、效用与回收
 
 > 状态: design (not started) | Tier: 2 | 包: packages/skills/skill-lifecycle | 依赖: 无
+>
+> 缝已对照 deepseek-harness **0.1.0-rc.7**（@`99f6f02fec`）复核；下文 path:line 引用均指该版本。
 
 ## 设计目标与用户问题
 
@@ -35,7 +37,7 @@ distillation/portability、governance/provenance)。`retrieveSkill` 只是中间
 | 1 evidence acquisition | 离线(手写/外部搬运),无运行时需求 | 不做 |
 | 2 proposal | `ctx.skills.register`(runtime 技能注册,`packages/skill/skill/src/index.ts:440`)存在,但无评审环节 | 复用为"已 admit 技能"的注册出口 |
 | 3 verification/admission | **缺失**:任何 provider 产出的 candidate 直接进目录与工具 | **核心**:admission gate |
-| 4 organization/storage | registry 有 rank/scope 层去重(`skill/src/index.ts:568-583`, `BUNDLED_SKILL_RANK=600` `:24` / `RUNTIME_RANK=250` `:27`),但无版本化、无内容寻址、无持久化 | 版本化 provenance store |
+| 4 organization/storage | registry 有 rank/scope 层去重(`skill/src/index.ts:568-583`, `RUNTIME_RANK=250` `:24` / `BUNDLED_SKILL_RANK=600` `:27`),但无版本化、无内容寻址、无持久化 | 版本化 provenance store |
 | 5 retrieval/composition | 已有:核心 `skill` 工具 + `<available_skills>` 目录(见下节) | 复用;rerank/组合不做 |
 | 6 maintenance/repair | **缺失**:无使用统计、无效用信号、无 demote | utility 追踪 + demote 提案 |
 | 7 distillation/portability | 无 | 不做(离线;导入 lint 提供入坞口) |
@@ -85,9 +87,12 @@ distillation/portability、governance/provenance)。`retrieveSkill` 只是中间
    可作委托目标(构造依赖见开放问题 1)。
 4. **权限与工具授予**:`PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions'`
    (`packages/interaction/permission-rules/lib/types/types.d.ts:34`,
-   `PERMISSION_MODES` 常量 `:36`);session 状态键 `'permission/mode': { mode: … }`
-   (`packages/core/session/src/types.ts:343`)。工具授予通道:`ctx.tools.restrict(filter)`
-   with `ToolRestriction { allow?, deny? }`(`packages/core/tools/src/index.ts:675-686,1071`);
+   `PERMISSION_MODES` 常量 `:36`);`'permission/mode'` 是 session **事件**类型而非状态键——
+   由 vendored `@deepseek-ai/dsh-permission-rules` lib 产物对 `SessionEventMap` 做
+   module augmentation 声明
+   (`packages/interaction/permission-rules/lib/types/index.d.ts:31-33`,
+   payload `{ mode: PermissionMode }`)。工具授予通道:`ctx.tools.restrict(filter)`
+   with `ToolRestriction { allow?, deny? }`(`packages/core/tools/src/index.ts:680-686,1071`);
    CC 格式 `allowed-tools` → `ToolRestriction` 的翻译仅在 vendored `skill-claude-code`
    的 lib 产物中存在(`packages/skill/skill-claude-code/lib/types/translate.d.ts:15-22`),
    dsh 内无运行时强制点 ⇒ grant-compat 检查由本插件在 admission 时做。
@@ -123,6 +128,10 @@ interface SkillGovernanceRecord {
 
 **状态机**:`candidate → active → archived`;`archived → active` 只允许经 rollback
 (指向历史 version)。每次迁移追加 audit 事件(actor: human|auto, trigger, reason)。
+
+#### 配置声明（rc.7 起）
+
+> **配置声明（rc.7 起）**：本插件的用户可调旋钮通过 settings 命名空间声明（`settingsNamespace` + `installSettingsSection`，`packages/settings/settings/src/index.ts:863`）：解析分层为 schema 默认值 → cordis 组合条目（base）→ `settings.yaml` 用户文档；支持 `settings/updated` 热更新与 `ctx.settings.describe()` 运行时读取。注册即暴露——#2404 移除了 apiproxy 白名单，注册是唯一的暴露控制点——因此 web 设置页与 `settings.yaml` 都可编辑；cordis `apply(ctx, config)` 第二参数保留为组合默认值层,本包的旋钮(`mode`、`lint`、`demote`、……)挂在该层。
 
 **配置**(zod;遵守共享原则 3 的执行强度连续谱):
 
@@ -177,7 +186,7 @@ Config = {
 | `safety/network-egress` | 指令中出现非预期网络调用(curl/wget/fetch URL、webhook 地址、硬编码 IP) |
 | `safety/secret-ref` | 引用凭据路径或环境变量外泄(`~/.ssh`、`$TOKEN` 拼接回传等) |
 | `grant/resolvable` | `allowed-tools` 每个名字 `ctx.tools.get` 可解析;不可解析即 block |
-| `grant/mode-compat` | 授予非空且当前 `'permission/mode' === 'plan'`(只读窗口)即 warn;`bypassPermissions` 下提高 egress/secret 两档 severity |
+| `grant/mode-compat` | 授予非空且经 `foldPermissionMode(agent.session.events)` 折叠出的 mode 为 `'plan'`(只读窗口)即 warn;`bypassPermissions` 下提高 egress/secret 两档 severity。注意:plan-mode overlay 由引擎在调用时刻叠加,折叠值可能漏掉进行中的 plan overlay |
 
 **rejection memory**:被拒 contentHash 持久化;重导同 hash 直接拒并附首次 lint 结论
 (SkillOpt rejection memory 的 admit 侧移植),避免重复计算与"改名重导"绕过。
@@ -223,9 +232,12 @@ Config = {
 1. **委托核心 fs provider 的实例化**:类已导出(`skill-filesystem/src/index.ts:146`),
    但构造签名/对 `ctx` 的依赖未核实。检查:读该文件 constructor 与 `apply`(`:130`)
    的组织方式;若不可独立实例化,退回自扫目录(逻辑薄,仅 frontmatter 解析 + 根枚举)。
-2. **`permission/mode` 的插件侧读口**:状态键已确认(`core/session/src/types.ts:343`),
-   具体订阅/读取 API 未验证。检查:其它插件如何读 session 状态(找 `permission/mode`
-   的消费方,grep 全仓)。
+2. **`permission/mode` 的插件侧读口**(部分解决):事件读取已解决——插件经
+   `foldPermissionMode(agent.session.events)`(由 `@deepseek-ai/dsh-permission-rules`
+   导出,`packages/interaction/permission-rules/lib/types/index.d.ts:103`,last-wins
+   折叠)读取 mode,或订阅 `session/event` 并按 `event.type === 'permission/mode'`
+   过滤。遗留警示:plan-mode overlay 由引擎在调用时刻叠加,折叠值可能漏掉一个
+   进行中的 plan overlay。
 3. **follow-error 统计的事件名**:`agent/post-tool` 或等价工具结果事件未验证。
    检查:梳理 `packages/core` 的 agent 事件表,确认工具调用完成事件及 error 字段。
 4. **插件持久化目录**:state 解析 API 未验证。检查:现有有状态插件(如 memory 系)

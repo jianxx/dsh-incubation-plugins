@@ -1,6 +1,8 @@
 # 07 rules-lifecycle — Capture, Activation, and Convergence of Behavioral Rule Artifacts
 
 > Status: design (not started) | Tier: 2 | Package: packages/memory/rules-lifecycle | Depends on: none
+>
+> Verified seams against deepseek-harness **0.1.0-rc.7** (@99f6f02fec); path:line citations refer to that tree.
 
 ## Design goal and user problem
 
@@ -112,6 +114,18 @@ only into "Risks and Open Questions".
    this pattern).
 
 ### Data Model / Configuration (rule entry schema, budgets, thresholds)
+
+> **Configuration (rc.7 onward)**: user-tunable knobs (the table below:
+> injection budgets, overflow mode, thresholds) are declared through a settings
+> namespace (`settingsNamespace` + `installSettingsSection`,
+> `packages/settings/settings/src/index.ts:863`). Resolution layers: schema
+> defaults → the cordis composition entry (base) → the `settings.yaml` user
+> document. Values hot-reload via `settings/updated` and are readable at runtime
+> through `ctx.settings.describe()`. Registering a namespace exposes it — #2404
+> removed the apiproxy allowlists, so registration is the only exposure control
+> — which means both the web settings page and `settings.yaml` can edit it. The
+> cordis `apply(ctx, config)` second argument remains the composition-defaults
+> layer; the `.dsh/rules/*.md` files below are rule content, not configuration.
 
 **Storage**: `.dsh/rules/{behavioral,code-standards,self-review,anti-patterns,workflow}.md`,
 five files corresponding one-to-one to the SSCA five sections. Writes go through the
